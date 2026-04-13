@@ -1,0 +1,112 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion as Motion } from "framer-motion";
+import { ShieldCheck, UserCog } from "lucide-react";
+import api, { extractApiData } from "../api";
+import { useAuth } from "../context/AuthContext";
+import { PrimaryButton, StatusMessage } from "../components/ui";
+import PasswordInput from "../components/PasswordInput";
+
+const LoginPage = () => {
+  const [form, setForm] = useState({ role: "student", email: "", password: "", studentId: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (form.role === "student" && !form.studentId.trim()) {
+        setError("Student ID is required");
+        setLoading(false);
+        return;
+      }
+      if (form.role === "student" && !form.password.trim()) {
+        setError("Password is required");
+        setLoading(false);
+        return;
+      }
+      if (form.role !== "student" && (!form.email.trim() || !form.password.trim())) {
+        setError("Email and password are required");
+        setLoading(false);
+        return;
+      }
+      const payload =
+        form.role === "student"
+          ? { role: "student", studentId: form.studentId.trim(), password: form.password }
+          : { role: form.role, email: form.email.trim(), password: form.password };
+      const response = await api.post("/auth/login", payload);
+      const data = extractApiData(response);
+      login(data.token, data.user);
+      navigate("/");
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-indigo-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky-200/50 blur-3xl" />
+      <Motion.form
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        onSubmit={submit}
+        className="glass-panel relative w-full max-w-md space-y-5 border-slate-200/80 p-7"
+      >
+        <div className="mb-1 flex items-start justify-between gap-3">
+          <div>
+            <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+              <ShieldCheck size={14} />
+              Secure access
+            </div>
+            <h1 className="text-2xl font-semibold text-slate-900">Welcome back</h1>
+            <p className="mt-1 text-sm text-slate-600">Login to continue to your placement portal dashboard.</p>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Role</p>
+          <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="student">Student</option><option value="faculty">Faculty</option><option value="admin">Admin</option>
+          </select>
+        </div>
+        {form.role === "student" ? (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Student ID</p>
+              <input className="input-modern" placeholder="Enter your student ID" onChange={(e) => setForm({ ...form, studentId: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>
+              <PasswordInput placeholder="Enter your password" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Email</p>
+              <input className="input-modern" placeholder="name.surname@vsit.edu.in" onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>
+              <PasswordInput placeholder="Enter your password" onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </div>
+          </div>
+        )}
+        <StatusMessage type="error" message={error} />
+        <PrimaryButton loading={loading} disabled={loading} className="w-full rounded-xl py-3">{loading ? "Logging In..." : "Login"}</PrimaryButton>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
+          <Link className="flex items-center gap-1 text-sm text-indigo-600 transition-colors duration-200 ease-in-out hover:text-indigo-500" to="/register"><UserCog size={14} />New student? Register</Link>
+          <Link className="text-sm text-indigo-600 hover:text-indigo-700" to="/forgot-password">Forgot password?</Link>
+        </div>
+      </Motion.form>
+    </div>
+  );
+};
+
+export default LoginPage;
