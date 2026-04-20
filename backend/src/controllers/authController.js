@@ -32,13 +32,17 @@ const registerStudent = async (req, res) => {
     const studentId = sanitizeString(req.body.studentId);
     const department = sanitizeString(req.body.department);
     const email = sanitizeString(req.body.email);
+    const phone = sanitizeString(req.body.phone);
     const password = sanitizeString(req.body.password);
 
-    if (!name || !studentId || !department || !email || !password) {
-      return fail(res, 400, "Name, student ID, email, department and password are required");
+    if (!name || !studentId || !department || !email || !phone || !password) {
+      return fail(res, 400, "Name, student ID, email, department, phone and password are required");
     }
     if (!instituteEmailRegex.test(email)) {
       return fail(res, 400, "Email must follow name.surname@vsit.edu.in format");
+    }
+    if (!/^\d{10}$/.test(phone)) {
+      return fail(res, 400, "Phone number must be exactly 10 digits");
     }
     if (!isValidDepartment(department)) {
       return fail(res, 400, "Invalid department");
@@ -56,7 +60,7 @@ const registerStudent = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await User.create({ name, studentId, department, role: "student", email, password: hashedPassword, isVerified: false });
+    await User.create({ name, studentId, department, role: "student", email, phone, password: hashedPassword, isVerified: false });
 
     const otp = `${crypto.randomInt(100000, 1000000)}`;
     await Otp.findOneAndUpdate(
@@ -120,8 +124,18 @@ const login = async (req, res) => {
     const role = sanitizeString(req.body.role);
 
     if (role === "student") {
-      if (!studentId || !password) return fail(res, 400, "studentId and password are required");
-      const student = await User.findOne({ studentId, role: "student" });
+      const identifier = studentId || email;
+      if (!identifier || !password) return fail(res, 400, "Student ID or email and password are required");
+
+      // Build query to match either studentId or email
+      const query = { role: "student" };
+      if (instituteEmailRegex.test(identifier)) {
+        query.email = identifier;
+      } else {
+        query.studentId = identifier;
+      }
+
+      const student = await User.findOne(query);
       if (process.env.NODE_ENV === "development") {
         // eslint-disable-next-line no-console
         console.log("[AUTH] student lookup:", Boolean(student), "verified:", Boolean(student?.isVerified));

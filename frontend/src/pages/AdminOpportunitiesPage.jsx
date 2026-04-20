@@ -15,6 +15,7 @@ const initial = {
   lastDate: "",
   applicationLink: "",
   department: OPPORTUNITY_BROADCAST_ALL,
+  technicalSkills: [],
 };
 
 const AdminOpportunitiesPage = () => {

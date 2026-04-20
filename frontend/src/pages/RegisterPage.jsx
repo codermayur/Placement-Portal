@@ -15,6 +15,7 @@ const RegisterPage = () => {
     studentId: "",
     department: "",
     email: "",
+    phone: "",
     password: "",
     otp: "",
   });
@@ -28,12 +29,16 @@ const RegisterPage = () => {
   const register = async () => {
     setError("");
     setMsg("");
-    if (!form.name.trim() || !form.studentId.trim() || !form.department.trim() || !form.email.trim() || !form.password.trim()) {
-      setError("Name, student ID, email, department and password are required.");
+    if (!form.name.trim() || !form.studentId.trim() || !form.department.trim() || !form.email.trim() || !form.phone.trim() || !form.password.trim()) {
+      setError("Name, student ID, email, department, phone and password are required.");
       return;
     }
     if (!instituteEmailRegex.test(form.email.trim())) {
       setError("Email must follow name.surname@vsit.edu.in format.");
+      return;
+    }
+    if (!/^\d{10}$/.test(form.phone.trim())) {
+      setError("Phone number must be exactly 10 digits.");
       return;
     }
     if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(form.password)) {
@@ -120,6 +125,10 @@ const RegisterPage = () => {
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Institute Email</p>
               <input className="input-modern" placeholder="name.surname@vsit.edu.in" onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Phone Number</p>
+              <input className="input-modern" placeholder="Enter your 10-digit phone number" type="tel" onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>

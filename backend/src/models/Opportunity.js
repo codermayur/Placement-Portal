@@ -12,6 +12,7 @@ const opportunitySchema = new mongoose.Schema(
     lastDate: { type: Date, required: true },
     status: { type: String, enum: ["active", "archived"], default: "active", index: true },
     department: { type: String, required: true, trim: true },
+    technicalSkills: [{ type: String, trim: true }],
     applicationLink: { type: String, required: true, trim: true },
     createdBy: { type: String, required: true, trim: true, index: true },
   },

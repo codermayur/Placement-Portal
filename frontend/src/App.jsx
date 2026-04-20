@@ -6,6 +6,7 @@ import FacultyDashboard from "./pages/FacultyDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageFacultyPage from "./pages/ManageFacultyPage";
 import ProfilePage from "./pages/ProfilePage";
+import StudentProfilePage from "./pages/StudentProfilePage";
 import FacultyOpportunitiesPage from "./pages/FacultyOpportunitiesPage";
 import AdminOpportunitiesPage from "./pages/AdminOpportunitiesPage";
 import StudentDeletionRequestPage from "./pages/StudentDeletionRequestPage";
@@ -43,6 +44,7 @@ const App = () => {
       <Route path="/my-posts" element={<ProtectedRoute allowRoles={["faculty"]}><FacultyOpportunitiesPage /></ProtectedRoute>} />
       <Route path="/manage-faculty" element={<ProtectedRoute allowRoles={["admin"]}><ManageFacultyPage /></ProtectedRoute>} />
       <Route path="/request-deletion" element={<ProtectedRoute allowRoles={["student"]}><StudentDeletionRequestPage /></ProtectedRoute>} />
+      <Route path="/student/profile" element={<ProtectedRoute allowRoles={["student"]}><StudentProfilePage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/student" element={<Navigate to="/dashboard" replace />} />
       <Route path="/faculty" element={<Navigate to="/dashboard" replace />} />

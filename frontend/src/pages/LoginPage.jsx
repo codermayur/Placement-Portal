@@ -8,7 +8,7 @@ import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
 
 const LoginPage = () => {
-  const [form, setForm] = useState({ role: "student", email: "", password: "", studentId: "" });
+  const [form, setForm] = useState({ role: "student", identifier: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -19,8 +19,8 @@ const LoginPage = () => {
     setError("");
     setLoading(true);
     try {
-      if (form.role === "student" && !form.studentId.trim()) {
-        setError("Student ID is required");
+      if (form.role === "student" && !form.identifier.trim()) {
+        setError("Student ID or email is required");
         setLoading(false);
         return;
       }
@@ -34,9 +34,13 @@ const LoginPage = () => {
         setLoading(false);
         return;
       }
+      const identifier = form.identifier.trim();
+      const isEmail = identifier.includes("@");
       const payload =
         form.role === "student"
-          ? { role: "student", studentId: form.studentId.trim(), password: form.password }
+          ? isEmail
+            ? { role: "student", email: identifier, password: form.password }
+            : { role: "student", studentId: identifier, password: form.password }
           : { role: form.role, email: form.email.trim(), password: form.password };
       const response = await api.post("/auth/login", payload);
       const data = extractApiData(response);
@@ -78,8 +82,8 @@ const LoginPage = () => {
         {form.role === "student" ? (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Student ID</p>
-              <input className="input-modern" placeholder="Enter your student ID" onChange={(e) => setForm({ ...form, studentId: e.target.value })} />
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Student ID or Email</p>
+              <input className="input-modern" placeholder="Enter your student ID or email" onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>

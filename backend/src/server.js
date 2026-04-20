@@ -7,6 +7,7 @@ const authRoutes = require("./routes/authRoutes");
 const opportunityRoutes = require("./routes/opportunityRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const studentRoutes = require("./routes/studentRoutes");
+const profileRoutes = require("./routes/profileRoutes");
 const metadataRoutes = require("./routes/metadataRoutes");
 const { sanitizeRequest } = require("./middleware/sanitizeMiddleware");
 const { seedAdminUser, DEFAULT_ADMIN } = require("./utils/seedAdmin");
@@ -70,6 +71,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/opportunities", opportunityRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
+app.use("/api/student", profileRoutes);
 app.use("/api/metadata", metadataRoutes);
 
 app.use((err, req, res, next) => {

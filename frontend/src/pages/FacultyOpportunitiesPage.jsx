@@ -5,6 +5,7 @@ import Layout from "../components/Layout";
 import OpportunityCard from "../components/OpportunityCard";
 import OpportunityForm from "../components/OpportunityForm";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 import {
   createOpportunity,
   deleteOpportunity,
@@ -12,19 +13,18 @@ import {
   getOpportunityById,
   updateOpportunity,
 } from "../services/opportunitiesService";
-import { OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
 
 const LAST_DEPARTMENT_KEY = "lastDepartment";
 
-const getInitialForm = () => ({
+const getInitialForm = (facultyDepartment) => ({
   announcementHeading: "",
   type: "Internship",
   description: "",
   eligibilityCriteria: [],
   lastDate: "",
   applicationLink: "",
-  department:
-    (typeof window !== "undefined" && window.localStorage.getItem(LAST_DEPARTMENT_KEY)) || OPPORTUNITY_BROADCAST_ALL,
+  department: facultyDepartment || "",
+  technicalSkills: [],
 });
 
 const normalizeToForm = (item) => ({
@@ -37,7 +37,8 @@ const normalizeToForm = (item) => ({
     .filter(Boolean),
   lastDate: item.lastDate ? new Date(item.lastDate).toISOString().slice(0, 10) : "",
   applicationLink: item.applicationLink || "",
-  department: item.department || OPPORTUNITY_BROADCAST_ALL,
+  department: item.department || "",
+  technicalSkills: Array.isArray(item.technicalSkills) ? item.technicalSkills : [],
 });
 
 const isArchived = (item) => new Date(item.lastDate).getTime() < Date.now();
@@ -52,7 +53,8 @@ const isValidHttpUrl = (value) => {
 };
 
 const FacultyOpportunitiesPage = () => {
-  const [form, setForm] = useState(getInitialForm);
+  const { user } = useAuth();
+  const [form, setForm] = useState(() => getInitialForm(user?.department));
   const [editingId, setEditingId] = useState(null);
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,7 +109,7 @@ const FacultyOpportunitiesPage = () => {
   }, [searchParams, setSearchParams]);
 
   const resetForm = () => {
-    setForm(getInitialForm());
+    setForm(getInitialForm(user?.department));
     setEditingId(null);
     setSelectedOpportunity(null);
     setSearchParams({});
@@ -142,7 +144,7 @@ const FacultyOpportunitiesPage = () => {
     announcementHeading: form.announcementHeading.trim(),
     description: form.description.trim(),
     applicationLink: /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink.trim() : `https://${form.applicationLink.trim()}`,
-    department: form.department || OPPORTUNITY_BROADCAST_ALL,
+    department: form.department,
     eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
       ? form.eligibilityCriteria.filter(Boolean).join(", ")
       : (form.eligibilityCriteria || "").trim(),

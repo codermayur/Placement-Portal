@@ -1,22 +1,28 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
 import OpportunityForm from "../components/OpportunityForm";
 import { SectionTitle, StatusMessage } from "../components/ui";
-import { OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
-
-const initial = {
-  announcementHeading: "",
-  type: "Internship",
-  description: "",
-  eligibilityCriteria: [],
-  lastDate: "",
-  applicationLink: "",
-  department: OPPORTUNITY_BROADCAST_ALL,
-};
+import { useAuth } from "../context/AuthContext";
 
 const PostOpportunityPage = () => {
+  const { user } = useAuth();
+
+  const initial = useMemo(
+    () => ({
+      announcementHeading: "",
+      type: "Internship",
+      description: "",
+      eligibilityCriteria: [],
+      lastDate: "",
+      applicationLink: "",
+      department: user?.department || "",
+      technicalSkills: [],
+    }),
+    [user?.department]
+  );
+
   const [form, setForm] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
