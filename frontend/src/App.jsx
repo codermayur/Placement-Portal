@@ -6,8 +6,7 @@ import FacultyDashboard from "./pages/FacultyDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManageFacultyPage from "./pages/ManageFacultyPage";
 import ProfilePage from "./pages/ProfilePage";
-import PostOpportunityPage from "./pages/PostOpportunityPage";
-import MyPostsPage from "./pages/MyPostsPage";
+import FacultyOpportunitiesPage from "./pages/FacultyOpportunitiesPage";
 import AdminOpportunitiesPage from "./pages/AdminOpportunitiesPage";
 import StudentDeletionRequestPage from "./pages/StudentDeletionRequestPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -40,8 +39,8 @@ const App = () => {
       <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
       <Route path="/dashboard" element={<ProtectedRoute><RoleDashboard /></ProtectedRoute>} />
       <Route path="/opportunities" element={<ProtectedRoute><RoleOpportunities /></ProtectedRoute>} />
-      <Route path="/post-opportunity" element={<ProtectedRoute allowRoles={["faculty"]}><PostOpportunityPage /></ProtectedRoute>} />
-      <Route path="/my-posts" element={<ProtectedRoute allowRoles={["faculty"]}><MyPostsPage /></ProtectedRoute>} />
+      <Route path="/post-opportunity" element={<ProtectedRoute allowRoles={["faculty"]}><FacultyOpportunitiesPage /></ProtectedRoute>} />
+      <Route path="/my-posts" element={<ProtectedRoute allowRoles={["faculty"]}><FacultyOpportunitiesPage /></ProtectedRoute>} />
       <Route path="/manage-faculty" element={<ProtectedRoute allowRoles={["admin"]}><ManageFacultyPage /></ProtectedRoute>} />
       <Route path="/request-deletion" element={<ProtectedRoute allowRoles={["student"]}><StudentDeletionRequestPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -63,7 +62,7 @@ const RoleDashboard = () => {
 const RoleOpportunities = () => {
   const { user } = useAuth();
   if (user?.role === "admin") return <AdminOpportunitiesPage />;
-  if (user?.role === "faculty") return <FacultyDashboard />;
+  if (user?.role === "faculty") return <FacultyOpportunitiesPage />;
   return <StudentDashboard role="Student" />;
 };
 

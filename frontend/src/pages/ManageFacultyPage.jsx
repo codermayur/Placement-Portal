@@ -4,6 +4,7 @@ import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
 import PasswordInput from "../components/PasswordInput";
 import { PrimaryButton, SectionTitle, StatusMessage } from "../components/ui";
+import { DEPARTMENTS } from "../constants/departments";
 
 const ManageFacultyPage = () => {
   const [facultyForm, setFacultyForm] = useState({ name: "", email: "", password: "", department: "" });
@@ -70,7 +71,12 @@ const ManageFacultyPage = () => {
           <input className="input-modern" placeholder="Faculty Name" value={facultyForm.name} onChange={(e) => setFacultyForm({ ...facultyForm, name: e.target.value })} />
           <input className="input-modern" placeholder="Faculty Email (name.surname@vsit.edu.in)" value={facultyForm.email} onChange={(e) => setFacultyForm({ ...facultyForm, email: e.target.value })} />
           <select className="input-modern" value={facultyForm.department} onChange={(e) => setFacultyForm({ ...facultyForm, department: e.target.value })}>
-            <option value="">Select Department</option><option value="CSE">CSE</option><option value="IT">IT</option><option value="ECE">ECE</option><option value="ME">ME</option><option value="CE">CE</option><option value="EEE">EEE</option><option value="MBA">MBA</option>
+            <option value="">Select Department</option>
+            {DEPARTMENTS.map((department) => (
+              <option key={department} value={department}>
+                {department}
+              </option>
+            ))}
           </select>
           <PasswordInput placeholder="Password" value={facultyForm.password} onChange={(e) => setFacultyForm({ ...facultyForm, password: e.target.value })} />
           <PrimaryButton onClick={createFaculty} loading={loading.faculty} disabled={loading.faculty}>Create Faculty</PrimaryButton>

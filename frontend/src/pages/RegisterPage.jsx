@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import api, { extractApiData } from "../api";
+import api, { extractApiData, extractApiError } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
+import { DEPARTMENTS } from "../constants/departments";
 
 const RegisterPage = () => {
   const [step, setStep] = useState(1);
@@ -41,11 +42,18 @@ const RegisterPage = () => {
     }
     setLoading(true);
     try {
-      await api.post("/auth/register", form);
-      setMsg("OTP sent to your email.");
+      const response = await api.post("/auth/register", form);
+      const data = extractApiData(response);
+      if (import.meta.env.DEV && data?.otp) {
+        setMsg(`${data?.message || "OTP generated"}. Dev OTP: ${data.otp}`);
+      } else if (data?.otpDelivery === "failed" && data?.otp) {
+        setMsg(`${data.message}. Use OTP: ${data.otp}`);
+      } else {
+        setMsg(data?.message || "OTP sent to your email.");
+      }
       setStep(2);
     } catch (err) {
-      setError(err.response?.data?.message || "Registration failed");
+      setError(extractApiError(err, "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +72,7 @@ const RegisterPage = () => {
       login(data.token, data.user);
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.message || "OTP verification failed");
+      setError(extractApiError(err, "OTP verification failed"));
     } finally {
       setLoading(false);
     }
@@ -102,7 +110,11 @@ const RegisterPage = () => {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Department</p>
               <select className="input-modern" onChange={(e) => setForm({ ...form, department: e.target.value })} defaultValue="">
                 <option value="" disabled>Select Department</option>
-                <option value="CSE">CSE</option><option value="IT">IT</option><option value="ECE">ECE</option><option value="ME">ME</option><option value="CE">CE</option><option value="EEE">EEE</option><option value="MBA">MBA</option>
+                {DEPARTMENTS.map((department) => (
+                  <option key={department} value={department}>
+                    {department}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-1.5">

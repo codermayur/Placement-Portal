@@ -1,8 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 html,
 body,
@@ -11,51 +8,85 @@ body,
   min-height: 100%;
 }
 
-body {
-  @apply m-0 min-h-screen text-brand-text;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  background:
-    radial-gradient(900px 440px at -10% -20%, rgba(99, 102, 241, 0.08), transparent 55%),
-    radial-gradient(900px 420px at 115% -10%, rgba(14, 165, 233, 0.08), transparent 58%),
-    #ffffff;
-  background-attachment: fixed;
-  color: #111111;
-}
-
-#root {
-  min-height: 100vh;
-}
-
 * {
   box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  color: #0f172a;
+  background:
+    radial-gradient(860px 460px at -8% -18%, rgba(99, 102, 241, 0.18), transparent 58%),
+    radial-gradient(850px 420px at 112% -10%, rgba(6, 182, 212, 0.14), transparent 58%),
+    linear-gradient(180deg, #f8fbff 0%, #f7f9fc 60%, #f8fafc 100%);
+  background-attachment: fixed;
 }
 
 *::selection {
   background: rgba(99, 102, 241, 0.2);
 }
 
-@layer components {
-  .glass-panel {
-    @apply rounded-2xl border bg-white shadow-sm transition-all duration-200 ease-in-out;
-    border-color: #e5e7eb;
-  }
+.glass-panel {
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.65));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 18px 40px -28px rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(14px);
+}
 
-  .glass-panel:hover {
-    border-color: #d1d5db;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  }
+.input-modern {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.46);
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.95rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+}
 
-  .input-modern {
-    @apply w-full rounded-xl border bg-white px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none transition-all duration-200 ease-in-out;
-    border-color: #e5e7eb;
-  }
+.input-modern:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+}
 
-  .input-modern:hover {
-    border-color: #d1d5db;
-  }
+.input-modern:focus {
+  transform: translateY(-1px);
+  border-color: #6366f1;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.17);
+}
 
-  .input-modern:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-  }
+.label-modern {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.45) transparent;
+}
+
+.modal-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(14, 165, 233, 0.6));
 }

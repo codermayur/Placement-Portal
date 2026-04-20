@@ -6,6 +6,7 @@ const Otp = require("../models/Otp");
 const { sendOtpEmail } = require("../utils/sendOtpEmail");
 const { sanitizeUserResponse, sanitizeString } = require("../utils/sanitize");
 const { fail, ok } = require("../utils/apiResponse");
+const { isValidDepartment } = require("../constants/departments");
 
 const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 const instituteEmailRegex = /^[a-z]+(?:\.[a-z]+)+@vsit\.edu\.in$/i;
@@ -39,6 +40,9 @@ const registerStudent = async (req, res) => {
     if (!instituteEmailRegex.test(email)) {
       return fail(res, 400, "Email must follow name.surname@vsit.edu.in format");
     }
+    if (!isValidDepartment(department)) {
+      return fail(res, 400, "Invalid department");
+    }
     if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
       return fail(res, 400, "Password must be 8+ chars with uppercase, number and special character");
     }
@@ -60,12 +64,24 @@ const registerStudent = async (req, res) => {
       { studentId, email, role: "student", purpose: "registration", otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
       { upsert: true }
     );
-    if (email) await sendOtpEmail(email, otp);
+    let otpDelivery = "sent";
+    let otpDeliveryError = "";
+    if (email) {
+      try {
+        await sendOtpEmail(email, otp);
+      } catch (mailError) {
+        otpDelivery = "failed";
+        otpDeliveryError = mailError.message;
+      }
+    }
 
     return ok(
       res,
       {
-        message: "OTP sent successfully",
+        message: otpDelivery === "sent" ? "OTP sent successfully" : "OTP generated, but email delivery failed",
+        otpDelivery,
+        ...(process.env.NODE_ENV !== "production" ? { otp } : {}),
+        ...(otpDeliveryError ? { otpDeliveryError } : {}),
       },
       201
     );

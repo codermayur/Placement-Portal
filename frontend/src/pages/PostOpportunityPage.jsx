@@ -4,15 +4,16 @@ import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
 import OpportunityForm from "../components/OpportunityForm";
 import { SectionTitle, StatusMessage } from "../components/ui";
+import { OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
 
 const initial = {
   announcementHeading: "",
   type: "Internship",
   description: "",
-  eligibilityCriteria: "",
+  eligibilityCriteria: [],
   lastDate: "",
   applicationLink: "",
-  department: "faculty-department",
+  department: OPPORTUNITY_BROADCAST_ALL,
 };
 
 const PostOpportunityPage = () => {
@@ -24,7 +25,10 @@ const PostOpportunityPage = () => {
   const submit = async () => {
     setError("");
     setMessage("");
-    if (!form.announcementHeading || !form.description || !form.eligibilityCriteria || !form.lastDate || !form.applicationLink) {
+    const hasEligibility = Array.isArray(form.eligibilityCriteria)
+      ? form.eligibilityCriteria.length > 0
+      : Boolean(form.eligibilityCriteria);
+    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
       setError("Please fill all required opportunity fields.");
       return;
     }

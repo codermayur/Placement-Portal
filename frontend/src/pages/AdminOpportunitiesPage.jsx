@@ -5,15 +5,16 @@ import Layout from "../components/Layout";
 import OpportunityForm from "../components/OpportunityForm";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
+import { OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
 
 const initial = {
   announcementHeading: "",
   type: "Internship",
   description: "",
-  eligibilityCriteria: "",
+  eligibilityCriteria: [],
   lastDate: "",
   applicationLink: "",
-  department: "all",
+  department: OPPORTUNITY_BROADCAST_ALL,
 };
 
 const AdminOpportunitiesPage = () => {
@@ -23,6 +24,8 @@ const AdminOpportunitiesPage = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [deletingId, setDeletingId] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -40,10 +43,18 @@ const AdminOpportunitiesPage = () => {
     load();
   }, []);
 
+  const resetForm = () => {
+    setForm(initial);
+    setEditingId(null);
+  };
+
   const createOpportunity = async () => {
     setError("");
     setMessage("");
-    if (!form.announcementHeading || !form.description || !form.eligibilityCriteria || !form.lastDate || !form.applicationLink) {
+    const hasEligibility = Array.isArray(form.eligibilityCriteria)
+      ? form.eligibilityCriteria.length > 0
+      : Boolean(form.eligibilityCriteria);
+    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
       setError("Please fill all required fields.");
       return;
     }
@@ -52,7 +63,7 @@ const AdminOpportunitiesPage = () => {
       const normalizedLink =
         /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink : `https://${form.applicationLink}`;
       await api.post("/opportunities", { ...form, applicationLink: normalizedLink });
-      setForm(initial);
+      resetForm();
       await load();
       setMessage("Opportunity created successfully.");
       toast.success("Opportunity created");
@@ -63,25 +74,134 @@ const AdminOpportunitiesPage = () => {
     }
   };
 
+  const updateOpportunity = async (id, payload) => {
+    const response = await api.put(`/opportunities/${id}`, payload);
+    return extractApiData(response);
+  };
+
+  const deleteOpportunity = async (id) => {
+    const response = await api.delete(`/opportunities/${id}`);
+    return extractApiData(response);
+  };
+
+  const handleEdit = (item) => {
+    const id = item._id;
+    setForm({
+      announcementHeading: item.announcementHeading || "",
+      type: item.type || "Internship",
+      description: item.description || "",
+      eligibilityCriteria: item.eligibilityCriteria ? item.eligibilityCriteria.split(", ").filter(Boolean) : [],
+      lastDate: item.lastDate ? new Date(item.lastDate).toISOString().split("T")[0] : "",
+      applicationLink: item.applicationLink || "",
+      department: item.department || OPPORTUNITY_BROADCAST_ALL,
+    });
+    setEditingId(id);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return;
+    setError("");
+    setMessage("");
+    const hasEligibility = Array.isArray(form.eligibilityCriteria)
+      ? form.eligibilityCriteria.length > 0
+      : Boolean(form.eligibilityCriteria);
+    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
+      setError("Please fill all required fields.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const normalizedLink =
+        /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink : `https://${form.applicationLink}`;
+      await updateOpportunity(editingId, { ...form, applicationLink: normalizedLink });
+      resetForm();
+      await load();
+      setMessage("Opportunity updated successfully.");
+      toast.success("Opportunity updated");
+    } catch (err) {
+      setError(extractApiError(err, "Failed to update opportunity"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = (item) => {
+    const id = item._id;
+    toast.custom(
+      (t) => (
+        <div className="w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+          <p className="font-semibold text-slate-900">Delete this opportunity?</p>
+          <p className="mt-1 text-sm text-slate-600">This action cannot be undone.</p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700"
+              onClick={() => toast.dismiss(t.id)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white"
+              onClick={async () => {
+                toast.dismiss(t.id);
+                setDeletingId(id);
+                try {
+                  await deleteOpportunity(id);
+                  await load();
+                  setMessage("Opportunity deleted successfully.");
+                  toast.success("Opportunity deleted");
+                  if (editingId === id) resetForm();
+                } catch (err) {
+                  setError(extractApiError(err, "Failed to delete opportunity"));
+                } finally {
+                  setDeletingId("");
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ),
+      { duration: 10000 }
+    );
+  };
+
+  const isArchived = (item) => item.status === "archived" || new Date(item.lastDate).getTime() < Date.now();
+
   return (
     <Layout role="Admin">
-      <SectionTitle title="Opportunities" subtitle="Create and review opportunities." />
+      <SectionTitle title="Opportunities" subtitle="Create, edit, and manage opportunities." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
       <OpportunityForm
         value={form}
         onChange={setForm}
-        onSubmit={createOpportunity}
-        submitLabel="Create Opportunity"
+        onSubmit={editingId ? handleSaveEdit : createOpportunity}
+        submitLabel={editingId ? "Save Changes" : "Create Opportunity"}
         showDepartment
         loading={saving}
+        isEditing={Boolean(editingId)}
+        onCancelEdit={editingId ? resetForm : undefined}
       />
       <div className="mt-6">
         {loading ? (
           <div className="py-8 flex justify-center"><Spinner /></div>
         ) : items.length ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => <OpportunityCard key={item._id} opportunity={item} />)}
+            {items.map((item) => (
+              <OpportunityCard
+                key={item._id}
+                opportunity={item}
+                canManage
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                editDisabled={isArchived(item)}
+                editLoading={Boolean(editingId && item._id === editingId && saving)}
+                deleteLoading={deletingId === item._id}
+              />
+            ))}
           </div>
         ) : (
           <EmptyState title="No active opportunities" subtitle="Create an opportunity using the form above." />

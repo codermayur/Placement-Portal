@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { isValidOpportunityDepartment } = require("../constants/departments");
 
 const getOpportunityStatus = (lastDate) => (new Date(lastDate) < new Date() ? "archived" : "active");
 
@@ -6,23 +7,25 @@ const opportunitySchema = new mongoose.Schema(
   {
     announcementHeading: { type: String, required: true, trim: true },
     type: { type: String, enum: ["Internship", "Placement"], required: true },
-    description: { type: String, required: true },
-    eligibilityCriteria: { type: mongoose.Schema.Types.Mixed, required: true },
+    description: { type: String, required: true, maxlength: 10000 },
+    eligibilityCriteria: { type: String, default: "" },
     lastDate: { type: Date, required: true },
     status: { type: String, enum: ["active", "archived"], default: "active", index: true },
     department: { type: String, required: true, trim: true },
     applicationLink: { type: String, required: true, trim: true },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    createdBy: { type: String, required: true, trim: true, index: true },
   },
   { timestamps: true }
 );
 
 opportunitySchema.pre("validate", function validateDepartment() {
-  const allowed = ["all", "CSE", "IT", "ECE", "ME", "CE", "EEE", "MBA"];
-  if (!allowed.includes(this.department)) {
+  if (!isValidOpportunityDepartment(this.department)) {
     throw new Error("Invalid department value");
   }
   this.status = getOpportunityStatus(this.lastDate);
 });
+
+opportunitySchema.index({ lastDate: 1 });
+opportunitySchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model("Opportunity", opportunitySchema);

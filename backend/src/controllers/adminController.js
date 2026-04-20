@@ -3,6 +3,7 @@ const User = require("../models/User");
 const DeletionRequest = require("../models/DeletionRequest");
 const { sanitizeString, sanitizeUserResponse } = require("../utils/sanitize");
 const { ok, fail } = require("../utils/apiResponse");
+const { isValidDepartment } = require("../constants/departments");
 const instituteEmailRegex = /^[a-z]+(?:\.[a-z]+)+@vsit\.edu\.in$/i;
 
 const createFaculty = async (req, res) => {
@@ -16,6 +17,9 @@ const createFaculty = async (req, res) => {
     }
     if (!instituteEmailRegex.test(email)) {
       return fail(res, 400, "Email must follow name.surname@vsit.edu.in format");
+    }
+    if (!isValidDepartment(department)) {
+      return fail(res, 400, "Invalid department");
     }
     const exists = await User.findOne({ email });
     if (exists) return fail(res, 400, "Email already exists");

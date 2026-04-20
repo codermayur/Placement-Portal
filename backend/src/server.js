@@ -7,7 +7,9 @@ const authRoutes = require("./routes/authRoutes");
 const opportunityRoutes = require("./routes/opportunityRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const studentRoutes = require("./routes/studentRoutes");
+const metadataRoutes = require("./routes/metadataRoutes");
 const { sanitizeRequest } = require("./middleware/sanitizeMiddleware");
+const { seedAdminUser, DEFAULT_ADMIN } = require("./utils/seedAdmin");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config();
@@ -19,11 +21,16 @@ const allowedOrigins = (
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const isLocalDevOrigin = (origin) =>
+  /^https?:\/\/localhost:\d+$/i.test(origin) || /^https?:\/\/127\.0\.0\.1:\d+$/i.test(origin);
+
 const corsOptions = {
   origin(origin, callback) {
     // Allow non-browser tools like curl/postman (no Origin header).
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes(origin) || (process.env.NODE_ENV !== "production" && isLocalDevOrigin(origin))) {
+      return callback(null, true);
+    }
     const corsError = new Error(`CORS blocked for origin: ${origin}`);
     corsError.status = 403;
     return callback(corsError);
@@ -63,6 +70,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/opportunities", opportunityRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
+app.use("/api/metadata", metadataRoutes);
 
 app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || "Server error" });
@@ -75,6 +83,16 @@ const startServer = async () => {
     process.exit(1);
   }
   await connectDB();
+  const adminSeedResult = await seedAdminUser();
+  if (adminSeedResult.created) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[ADMIN SEED] Admin created: email=${DEFAULT_ADMIN.email} password=${DEFAULT_ADMIN.password}`
+    );
+  } else {
+    // eslint-disable-next-line no-console
+    console.log(`[ADMIN SEED] Admin already present: email=${adminSeedResult.email}`);
+  }
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     // eslint-disable-next-line no-console

@@ -1,97 +1,281 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { PrimaryButton } from "./ui";
+import { DEPARTMENTS, OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
+
+const departmentOptions = DEPARTMENTS;
+const yearOptions = ["First Year", "Second Year", "Third Year", "Masters"];
+
+const parseToArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    if (!value.trim()) return [];
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 const OpportunityForm = ({
   value,
   onChange,
   onSubmit,
-  submitLabel,
-  showDepartment,
-  departmentLocked,
-  loading,
+  submitLabel = "Submit",
+  showDepartment = true,
+  departmentLocked = false,
+  loading = false,
+  isEditing = false,
+  onCancelEdit,
 }) => {
   const today = new Date().toISOString().split("T")[0];
+  const [showDepartmentPanel, setShowDepartmentPanel] = useState(false);
+  const [showEligibilityPanel, setShowEligibilityPanel] = useState(false);
+  const departmentRef = useRef(null);
+  const eligibilityRef = useRef(null);
+
+  const selectedDepartments = useMemo(() => {
+    if (value.department === OPPORTUNITY_BROADCAST_ALL) return [...departmentOptions];
+    return parseToArray(value.department);
+  }, [value.department]);
+
+  const selectedYears = useMemo(() => parseToArray(value.eligibilityCriteria), [value.eligibilityCriteria]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      if (departmentRef.current && !departmentRef.current.contains(event.target)) setShowDepartmentPanel(false);
+      if (eligibilityRef.current && !eligibilityRef.current.contains(event.target)) setShowEligibilityPanel(false);
+    };
+
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const pushNext = (nextValue) => onChange({ ...value, ...nextValue });
+
+  const toggleDepartment = (dept) => {
+    if (departmentLocked) return;
+
+    let next;
+    if (value.department === OPPORTUNITY_BROADCAST_ALL) {
+      // If currently all, deselect all and select this one
+      next = [dept];
+    } else {
+      const current = parseToArray(value.department);
+      const has = current.includes(dept);
+      next = has ? current.filter((item) => item !== dept) : [...current, dept];
+    }
+
+    if (next.length === departmentOptions.length) {
+      pushNext({ department: OPPORTUNITY_BROADCAST_ALL });
+    } else {
+      pushNext({ department: next.join(", ") });
+    }
+  };
+
+  const toggleAllDepartments = () => pushNext({ department: OPPORTUNITY_BROADCAST_ALL });
+
+  const toggleEligibility = (year) => {
+    const has = selectedYears.includes(year);
+    const next = has ? selectedYears.filter((item) => item !== year) : [...selectedYears, year];
+    pushNext({ eligibilityCriteria: next });
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    onSubmit?.();
+  };
+
+  const departmentText =
+    value.department === OPPORTUNITY_BROADCAST_ALL ? "Broadcast to All Departments" : `${selectedDepartments.length} selected`;
+
   return (
-  <div className="glass-panel grid gap-4 p-6 md:grid-cols-2">
-    <label className="space-y-1">
-      <span className="text-xs uppercase tracking-wide text-gray-700">Announcement Heading</span>
-      <input
-        className="input-modern"
-        placeholder="SDE Internship Drive - 2026"
-        value={value.announcementHeading}
-        onChange={(e) => onChange({ ...value, announcementHeading: e.target.value })}
-      />
-    </label>
-    <label className="space-y-1">
-      <span className="text-xs uppercase tracking-wide text-gray-700">Opportunity Type</span>
-      <select
-        className="input-modern"
-        value={value.type}
-        onChange={(e) => onChange({ ...value, type: e.target.value })}
-      >
-        <option>Internship</option>
-        <option>Placement</option>
-      </select>
-    </label>
-    <label className="space-y-1 md:col-span-2">
-      <span className="text-xs uppercase tracking-wide text-gray-700">Description</span>
-      <textarea
-        className="input-modern min-h-24"
-        placeholder="Write concise details and timeline."
-        value={value.description}
-        onChange={(e) => onChange({ ...value, description: e.target.value })}
-      />
-    </label>
-    <label className="space-y-1">
-      <span className="text-xs uppercase tracking-wide text-gray-700">Eligibility Criteria</span>
-      <input
-        className="input-modern"
-        placeholder="CGPA >= 7.0, no active backlogs"
-        value={value.eligibilityCriteria}
-        onChange={(e) => onChange({ ...value, eligibilityCriteria: e.target.value })}
-      />
-    </label>
-    <label className="space-y-1">
-      <span className="text-xs uppercase tracking-wide text-gray-700">Last Date</span>
-      <input
-        type="date"
-        className="input-modern"
-        value={value.lastDate}
-        min={today}
-        onChange={(e) => onChange({ ...value, lastDate: e.target.value })}
-      />
-    </label>
-    {showDepartment && (
-      <label className="space-y-1">
-        <span className="text-xs uppercase tracking-wide text-gray-700">Department</span>
+    <form onSubmit={handleSubmit} className="glass-panel grid gap-5 p-5 md:grid-cols-2 md:p-6">
+      <div className="md:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
+          <h3 className="text-xl font-semibold text-slate-800">
+            {isEditing ? "Edit Opportunity Details" : "Opportunity Details"}
+          </h3>
+          <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+            Faculty Form
+          </span>
+        </div>
+      </div>
+
+      <label className="md:col-span-2">
+        <span className="label-modern">Announcement Heading</span>
+        <input
+          className="input-modern"
+          placeholder="SDE Internship Drive - 2026"
+          value={value.announcementHeading || ""}
+          onChange={(event) => pushNext({ announcementHeading: event.target.value })}
+          required
+          aria-label="Announcement heading"
+        />
+      </label>
+
+      <label>
+        <span className="label-modern">Opportunity Type</span>
         <select
           className="input-modern"
-          value={value.department}
-          disabled={departmentLocked}
-          onChange={(e) => onChange({ ...value, department: e.target.value })}
+          value={value.type || "Internship"}
+          onChange={(event) => pushNext({ type: event.target.value })}
+          aria-label="Opportunity type"
         >
-          <option value="all">Broadcast to All</option>
-          <option value="CSE">CSE</option>
-          <option value="IT">IT</option>
-          <option value="ECE">ECE</option>
-          <option value="ME">ME</option>
+          <option value="Internship">Internship</option>
+          <option value="Placement">Placement</option>
         </select>
       </label>
-    )}
-    <label className={`space-y-1 ${showDepartment ? "" : "md:col-span-2"}`}>
-      <span className="text-xs uppercase tracking-wide text-gray-700">Application Link</span>
-      <input
-        className="input-modern"
-        placeholder="https://forms.gle/..."
-        value={value.applicationLink}
-        onChange={(e) => onChange({ ...value, applicationLink: e.target.value })}
-      />
-    </label>
-    <button
-      onClick={onSubmit}
-      disabled={loading}
-      className="rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 p-2.5 font-medium text-white transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-70 md:col-span-2"
-    >
-      {submitLabel}
-    </button>
-  </div>
+
+      {showDepartment ? (
+        <div ref={departmentRef} className="relative">
+          <span className="label-modern">Department</span>
+          <button
+            type="button"
+            disabled={departmentLocked}
+            onClick={() => setShowDepartmentPanel((open) => !open)}
+            className="input-modern flex items-center justify-between text-left disabled:cursor-not-allowed disabled:bg-slate-100"
+            aria-haspopup="listbox"
+            aria-expanded={showDepartmentPanel}
+            aria-label="Department selector"
+          >
+            <span>{departmentText}</span>
+            <ChevronDown size={16} className={`transition ${showDepartmentPanel ? "rotate-180" : ""}`} />
+          </button>
+
+          {showDepartmentPanel ? (
+            <div className="glass-panel absolute z-20 mt-2 w-full space-y-3 p-3">
+              <button
+                type="button"
+                onClick={toggleAllDepartments}
+                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm text-slate-700 transition hover:bg-indigo-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.department === OPPORTUNITY_BROADCAST_ALL}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    toggleAllDepartments();
+                  }}
+                />
+                Broadcast to All Departments
+              </button>
+              <div className="grid grid-cols-2 gap-2">
+                {departmentOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => toggleDepartment(option)}
+                    className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-slate-700 transition hover:bg-indigo-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDepartments.includes(option)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleDepartment(option);
+                      }}
+                    />
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <label className="md:col-span-2">
+        <span className="label-modern">Description</span>
+        <textarea
+          rows={6}
+          maxLength={10000}
+          className="input-modern resize-y"
+          placeholder="Share role details, hiring process, requirements, and important notes."
+          value={value.description || ""}
+          onChange={(event) => pushNext({ description: event.target.value })}
+          required
+          aria-label="Opportunity description"
+        />
+      </label>
+
+      <label>
+        <span className="label-modern">Last Date</span>
+        <input
+          type="date"
+          className="input-modern"
+          value={value.lastDate || ""}
+          min={today}
+          onChange={(event) => pushNext({ lastDate: event.target.value })}
+          required
+          aria-label="Application last date"
+        />
+      </label>
+
+      <div ref={eligibilityRef} className="relative">
+        <span className="label-modern">Eligibility Criteria</span>
+        <button
+          type="button"
+          onClick={() => setShowEligibilityPanel((open) => !open)}
+          className="input-modern flex items-center justify-between text-left"
+          aria-haspopup="listbox"
+          aria-expanded={showEligibilityPanel}
+          aria-label="Eligibility year selector"
+        >
+          <span>{selectedYears.length ? `${selectedYears.length} selected` : "Select eligible years"}</span>
+          <ChevronDown size={16} className={`transition ${showEligibilityPanel ? "rotate-180" : ""}`} />
+        </button>
+
+        {showEligibilityPanel ? (
+          <div className="glass-panel absolute z-20 mt-2 w-full p-3">
+            <div className="grid grid-cols-2 gap-2">
+              {yearOptions.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => toggleEligibility(year)}
+                  className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm text-slate-700 transition hover:bg-indigo-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedYears.includes(year)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      toggleEligibility(year);
+                    }}
+                  />
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <label className="md:col-span-2">
+        <span className="label-modern">Application Link</span>
+        <input
+          type="url"
+          className="input-modern"
+          placeholder="https://forms.gle/..."
+          value={value.applicationLink || ""}
+          onChange={(event) => pushNext({ applicationLink: event.target.value })}
+          required
+          aria-label="Application link"
+        />
+      </label>
+
+      <PrimaryButton type="submit" loading={loading} disabled={loading} className="md:col-span-2">
+        {submitLabel}
+      </PrimaryButton>
+      {isEditing && onCancelEdit ? (
+        <button
+          type="button"
+          onClick={onCancelEdit}
+          className="md:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:text-indigo-600"
+        >
+          Cancel Edit
+        </button>
+      ) : null}
+    </form>
   );
 };
 

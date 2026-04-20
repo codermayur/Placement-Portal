@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { DEPARTMENTS } = require("../constants/departments");
 
 const userSchema = new mongoose.Schema(
   {
@@ -16,6 +17,7 @@ const userSchema = new mongoose.Schema(
       required: function requiredDepartment() {
         return this.role !== "admin";
       },
+      enum: DEPARTMENTS,
       trim: true,
     },
     password: {
