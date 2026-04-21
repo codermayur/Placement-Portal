@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import api, { extractApiData, extractApiError } from "../api";
+import { applyToOpportunity } from "../services/opportunitiesService";
 import Layout from "../components/Layout";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
 
 const StudentDashboard = ({ role = "Student" }) => {
   const [active, setActive] = useState([]);
@@ -12,23 +14,32 @@ const StudentDashboard = ({ role = "Student" }) => {
   const [loading, setLoading] = useState(true);
   const [message] = useState("");
   const [error, setError] = useState("");
+  const [appliedId, setAppliedId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [activeRes, archiveRes] = await Promise.all([api.get("/opportunities/active"), api.get("/opportunities/archive")]);
+      setActive(extractApiData(activeRes) || []);
+      setArchive(extractApiData(archiveRes) || []);
+    } catch (err) {
+      setError(extractApiError(err, "Failed to load opportunities"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const [activeRes, archiveRes] = await Promise.all([api.get("/opportunities/active"), api.get("/opportunities/archive")]);
-        setActive(extractApiData(activeRes) || []);
-        setArchive(extractApiData(archiveRes) || []);
-      } catch (err) {
-        setError(extractApiError(err, "Failed to load opportunities"));
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    if (appliedId) {
+      load();
+      setAppliedId(null);
+    }
+  }, [appliedId, load]);
 
   const activeView = useMemo(
     () =>
@@ -41,6 +52,15 @@ const StudentDashboard = ({ role = "Student" }) => {
         ),
     [active, search, sort]
   );
+  const handleApply = useCallback(async (id) => {
+    try {
+      await applyToOpportunity(id);
+      setAppliedId(id);
+    } catch (err) {
+      setError(extractApiError(err, "Failed to apply to opportunity"));
+    }
+  }, []);
+
   const archiveView = useMemo(
     () =>
       [...archive]
@@ -81,11 +101,11 @@ const StudentDashboard = ({ role = "Student" }) => {
             <>
           <h2 className="text-xl font-semibold text-black">Active Opportunities</h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {activeView.length ? activeView.map((item) => <OpportunityCard key={item._id} opportunity={item} />) : <EmptyState title="No active opportunities" subtitle="Check back later for new postings." />}
+{activeView.length ? activeView.map((item) => <OpportunityCard key={item._id} opportunity={item} hasApplied={item.hasApplied ?? false} onApply={handleApply} />) : <EmptyState title="No active opportunities" subtitle="Check back later for new postings." />}
           </div>
           <h2 className="pt-2 text-xl font-semibold text-black">Archived Opportunities</h2>
           <div className="grid gap-4 md:grid-cols-2">
-            {archiveView.length ? archiveView.map((item) => <OpportunityCard key={item._id} opportunity={item} />) : <EmptyState title="No archived opportunities" subtitle="Expired postings will appear here automatically." />}
+{archiveView.length ? archiveView.map((item) => <OpportunityCard key={item._id} opportunity={item} hasApplied={item.hasApplied ?? false} onApply={handleApply} />) : <EmptyState title="No archived opportunities" subtitle="Expired postings will appear here automatically." />}
           </div>
             </>
           )}

@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+
 import { motion as Motion } from "framer-motion";
-import { Building2, CalendarClock, ExternalLink, GraduationCap, Pencil, Sparkles, Trash2, Badge, FileText, User, Clock, Code } from "lucide-react";
-import { Modal, PrimaryButton } from "./ui";
+import { Building2, CalendarClock, ExternalLink, GraduationCap, Pencil, Sparkles, Trash2, Badge, FileText, User, Clock, Code, Calendar, Mail } from "lucide-react";
+import { Modal, PrimaryButton, EmptyState, Spinner } from "./ui";
 import { DEPARTMENTS, OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
 
 const toLabel = (value) => {
@@ -27,28 +30,50 @@ const OpportunityCard = ({
   opportunity,
   className = "",
   canManage = false,
+  hasApplied = false,
+  onApply = () => {},
   onEdit,
   onDelete,
   editDisabled = false,
   editLoading = false,
   deleteLoading = false,
 }) => {
-  const archived = opportunity.status === "archived" || isExpired(opportunity.lastDate);
   const [isOpen, setIsOpen] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [localApplied, setLocalApplied] = useState(hasApplied);
+  const effectiveApplied = localApplied || hasApplied;
+
+const handleApply = async () => {
+    if (applying || effectiveApplied) return;
+    setApplying(true);
+    try {
+      await onApply(opportunity._id);
+      setLocalApplied(true);
+    } catch (error) {
+      console.error("Apply failed:", error);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+
+const archived = opportunity.status === "archived" || isExpired(opportunity.lastDate);
+  const isDisabled = archived || effectiveApplied;
 
   return (
     <>
       <Motion.article
-        whileHover={{ y: -8 }}
-        onClick={() => setIsOpen(true)}
-        onKeyDown={(event) => {
+whileHover={isDisabled ? {} : { y: -8 }}
+        onClick={isDisabled ? undefined : () => setIsOpen(true)}
+        onKeyDown={isDisabled ? undefined : (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             setIsOpen(true);
           }
         }}
-        tabIndex={0}
-        role="button"
+        tabIndex={isDisabled ? undefined : 0}
+        role={isDisabled ? undefined : "button"}
+        aria-disabled={isDisabled}
         className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/80 bg-white/65 shadow-[0_16px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-200 hover:shadow-[0_22px_44px_-16px_rgba(99,102,241,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${className}`}
       >
         <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-sky-500 to-cyan-400" />
@@ -59,14 +84,17 @@ const OpportunityCard = ({
               <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
                 {opportunity.type}
               </span>
-              <span
+<span
                 className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                   archived
                     ? "border-rose-200 bg-rose-50 text-rose-700"
+                    : effectiveApplied
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
                     : "border-emerald-200 bg-emerald-50 text-emerald-700"
                 }`}
               >
-                {archived ? "Archived" : "Active"}
+                {archived ? "Archived" : effectiveApplied ? "Applied" : "Active"}
+{}
               </span>
             </div>
           </div>
@@ -103,7 +131,7 @@ const OpportunityCard = ({
             )}
           </div>
 
-          <PrimaryButton className="w-full" onClick={(event) => event.stopPropagation()}>
+          <PrimaryButton className="w-full" onClick={() => setIsOpen(true)}>
             View Details
           </PrimaryButton>
         </div>
@@ -294,26 +322,29 @@ const OpportunityCard = ({
           </div>
 
           {/* Action Button */}
-          {archived ? (
-            <PrimaryButton disabled className="w-full bg-slate-200 text-slate-500 shadow-none hover:translate-y-0 hover:shadow-none">
-              Archived
+{effectiveApplied ? (
+            <PrimaryButton disabled className="w-full bg-emerald-200 text-emerald-700 shadow-none hover:translate-y-0 hover:shadow-none">
+              <span className="flex items-center gap-2 justify-center">
+                ✓ Applied Successfully
+              </span>
             </PrimaryButton>
-          ) : opportunity.applicationLink ? (
-            <a href={opportunity.applicationLink} target="_blank" rel="noreferrer" aria-label="Open application link in new tab">
-              <PrimaryButton className="w-full" onClick={() => setIsOpen(false)}>
-                <Sparkles size={15} />
-                Apply Now
-                <ExternalLink size={14} />
-              </PrimaryButton>
-            </a>
+          ) : archived ? (
+            <PrimaryButton disabled className="w-full bg-slate-200 text-slate-500 shadow-none hover:translate-y-0 hover:shadow-none">
+              Archived - Cannot Apply
+            </PrimaryButton>
           ) : (
-            <PrimaryButton disabled className="w-full">
-              No Application Link Available
+            <PrimaryButton
+              className="w-full"
+              onClick={handleApply}
+              disabled={applying}
+              loading={applying}
+            >
+              {applying ? "Applying..." : "Apply Now"}
+              <Sparkles size={15} />
             </PrimaryButton>
           )}
         </div>
       </Modal>
-    </>
   );
 };
 

@@ -71,7 +71,17 @@ const listOpportunities = async (req, res) => {
       ];
     }
 
-    const items = await Opportunity.find(filter).sort({ createdAt: -1 });
+    const pipeline = [
+      { $match: filter },
+      {
+        $addFields: {
+          applicationCount: { $size: { $ifNull: ["$applications", []] } }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ];
+
+    const items = await Opportunity.aggregate(pipeline);
     return ok(res, items.map(normalizeOpportunity));
   } catch (error) {
     return fail(res, 500, "Failed to fetch opportunities", error.message);
@@ -195,7 +205,17 @@ const getActiveOpportunities = async (req, res) => {
     ];
   }
 
-  const data = await Opportunity.find(filter).sort({ lastDate: 1, createdAt: -1 });
+  const pipeline = [
+    { $match: filter },
+    {
+      $addFields: {
+        applicationCount: { $size: { $ifNull: ["$applications", []] } }
+      }
+    },
+    { $sort: { lastDate: 1, createdAt: -1 } }
+  ];
+
+  const data = await Opportunity.aggregate(pipeline);
   return ok(res, data.map(normalizeOpportunity));
 };
 
@@ -213,8 +233,118 @@ const getArchivedOpportunities = async (req, res) => {
     ];
   }
 
-  const data = await Opportunity.find(filter).sort({ lastDate: -1, createdAt: -1 });
+  const pipeline = [
+    { $match: filter },
+    {
+      $addFields: {
+        applicationCount: { $size: { $ifNull: ["$applications", []] } }
+      }
+    },
+    { $sort: { lastDate: -1, createdAt: -1 } }
+  ];
+
+  const data = await Opportunity.aggregate(pipeline);
   return ok(res, data.map(normalizeOpportunity));
+};
+
+const applyToOpportunity = async (req, res) => {
+  try {
+    console.log('[APPLY_DEBUG] req.user:', {
+      id: req.user._id,
+      email: req.user.email,
+      role: req.user.role,
+      studentId: req.user.studentId,
+      name: req.user.name,
+      department: req.user.department,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName
+    });
+
+    if (req.user.role !== "student") {
+      return fail(res, 403, "Only students can apply");
+    }
+
+    // Validate studentId
+    if (!req.user.studentId) {
+      console.error('[APPLY_ERROR] Missing studentId for user:', req.user.email);
+      return fail(res, 400, "Student ID is required. Please complete your profile.");
+    }
+
+    const opportunity = await Opportunity.findById(req.params.id);
+    console.log('[APPLY_DEBUG] opportunity:', {
+      id: req.params.id,
+      found: !!opportunity,
+      status: opportunity?.status,
+      department: opportunity?.department
+    });
+
+    if (!opportunity) {
+      return fail(res, 404, "Opportunity not found");
+    }
+
+    if (opportunity.status !== "active") {
+      return fail(res, 400, "Cannot apply to inactive/archived opportunities");
+    }
+
+    // Check if already applied
+    const alreadyApplied = opportunity.applications.some(app => app.studentEmail === req.user.email);
+    if (alreadyApplied) {
+      return fail(res, 400, "You have already applied to this opportunity");
+    }
+
+    // Prepare application data
+    const studentName = (req.user.name || req.user.email || 'Unknown').trim();
+    const applicationData = {
+      studentId: req.user.studentId,
+      studentEmail: req.user.email,
+      studentName,
+      studentDepartment: req.user.department || 'Not specified',
+      appliedAt: new Date()
+    };
+
+    console.log('[APPLY_DEBUG] Adding application:', applicationData);
+
+    // Add application
+    opportunity.applications.push(applicationData);
+
+    const updatedOpportunity = await opportunity.save();
+    console.log('[APPLY_SUCCESS] Application added for:', req.user.email);
+    return ok(res, normalizeOpportunity(updatedOpportunity));
+  } catch (error) {
+    console.error('[APPLY_ERROR] Full error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    return fail(res, 500, "Failed to apply to opportunity", error.message);
+  }
+};
+
+const getOpportunityApplications = async (req, res) => {
+  try {
+    const opportunity = await Opportunity.findById(req.params.id);
+
+    if (!opportunity) return fail(res, 404, "Opportunity not found");
+
+    // Permission check: admin, faculty (owner), or own opportunity
+    if (req.user.role !== "admin" && !isOwner(opportunity, req.user)) {
+      return fail(res, 403, "You don't have permission to view applications");
+    }
+
+    const applications = opportunity.applications.map(app => ({
+      ...app.toObject(),
+      studentName: app.studentName,
+      count: opportunity.applications.length
+    }));
+
+    return ok(res, {
+      applications,
+      count: applications.length,
+      opportunityId: opportunity._id
+    });
+  } catch (error) {
+    return fail(res, 500, "Failed to fetch applications", error.message);
+  }
 };
 
 module.exports = {
@@ -225,4 +355,6 @@ module.exports = {
   deleteOpportunity,
   getActiveOpportunities,
   getArchivedOpportunities,
+  applyToOpportunity,
+  getOpportunityApplications,
 };

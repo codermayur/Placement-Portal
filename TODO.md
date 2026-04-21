@@ -1,21 +1,8 @@
-# Fix POST /api/opportunities 400 Error
+# Task: Hide application count and disable clickable student ID for students
 
-Status: In Progress
+## Steps:
+- [x] Step 1: Edit complete ✅
+- [x] Step 2: Verified - application count removed from badge, applications modal/states removed for students (canManage=false), no clickable student IDs or demo data.
+- [x] Step 3: Task complete.
 
-**Diagnosis:**
-- Missing/invalid `applicationLink` (required in schema but no frontend field)
-- Possible empty `eligibilityCriteria` failing validation
-
-**Completed:**
-- [x] Created TODO.md
-- [x] Updated `backend/src/models/Opportunity.js`: Made `applicationLink` optional
-- [x] Updated `backend/src/controllers/opportunityController.js`: Removed `eligibilityCriteria` from strict required, added detailed logging
-
-**Remaining Steps:**
-1. Restart backend server to apply changes
-2. Test POST /api/opportunities with valid payload (curl or form)
-3. Check server console for logs if still 400
-4. Frontend test form submission (ensure JSON body, auth token)
-5. attempt_completion
-
-**Updated TODO after each step.**
+**All changes implemented in frontend/src/components/OpportunityCard.jsx.**

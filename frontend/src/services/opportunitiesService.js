@@ -35,6 +35,32 @@ export const updateOpportunity = async (id, payload) => {
   }
 };
 
+export const applyToOpportunity = async (id) => {
+  try {
+    const response = await api.post(`/opportunities/${id}/apply`);
+    return extractApiData(response);
+  } catch (error) {
+    const message = extractApiError(error, "Failed to apply");
+    if (error?.response?.status === 400 && message.includes("already applied")) {
+      throw new Error("You have already applied to this opportunity");
+    }
+    if (error?.response?.status === 403) throw new Error("Only students can apply");
+    if (error?.response?.status === 400 && message.includes("archived")) {
+      throw new Error("Cannot apply to archived opportunities");
+    }
+    throw new Error(message);
+  }
+};
+
+export const getOpportunityApplications = async (id) => {
+  try {
+    const response = await api.get(`/opportunities/${id}/applications`);
+    return extractApiData(response) || { applications: [] };
+  } catch (error) {
+    throw new Error(extractApiError(error, "Failed to fetch applications"));
+  }
+};
+
 export const deleteOpportunity = async (id) => {
   try {
     const response = await api.delete(`/opportunities/${id}`);

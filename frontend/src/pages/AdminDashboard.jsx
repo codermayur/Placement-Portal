@@ -52,8 +52,12 @@ const AdminDashboard = () => {
           <div className="py-8 flex justify-center"><Spinner /></div>
         ) : allOpportunities.length ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {allOpportunities.map((item) => (
-              <OpportunityCard key={item._id} opportunity={item} />
+{allOpportunities.map((item) => (
+              <OpportunityCard
+                key={item._id}
+                opportunity={item}
+                canManage={true}
+              />
             ))}
           </div>
         ) : (
