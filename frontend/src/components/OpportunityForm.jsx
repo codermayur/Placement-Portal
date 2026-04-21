@@ -342,19 +342,6 @@ const OpportunityForm = ({
         )}
       </div>
 
-      <label className="md:col-span-2">
-        <span className="label-modern">Application Link</span>
-        <input
-          type="url"
-          className="input-modern"
-          placeholder="https://forms.gle/..."
-          value={value.applicationLink || ""}
-          onChange={(event) => pushNext({ applicationLink: event.target.value })}
-          required
-          aria-label="Application link"
-        />
-      </label>
-
       <PrimaryButton type="submit" loading={loading} disabled={loading} className="md:col-span-2">
         {submitLabel}
       </PrimaryButton>

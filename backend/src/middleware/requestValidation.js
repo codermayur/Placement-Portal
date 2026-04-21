@@ -7,7 +7,6 @@ const validateOpportunityRequest = (req, res, next) => {
     "type",
     "description",
     "lastDate",
-    "applicationLink",
   ];
   if (req.user?.role !== "faculty") {
     required.push("department");

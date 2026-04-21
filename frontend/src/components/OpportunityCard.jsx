@@ -298,7 +298,7 @@ const OpportunityCard = ({
             <PrimaryButton disabled className="w-full bg-slate-200 text-slate-500 shadow-none hover:translate-y-0 hover:shadow-none">
               Archived
             </PrimaryButton>
-          ) : (
+          ) : opportunity.applicationLink ? (
             <a href={opportunity.applicationLink} target="_blank" rel="noreferrer" aria-label="Open application link in new tab">
               <PrimaryButton className="w-full" onClick={() => setIsOpen(false)}>
                 <Sparkles size={15} />
@@ -306,6 +306,10 @@ const OpportunityCard = ({
                 <ExternalLink size={14} />
               </PrimaryButton>
             </a>
+          ) : (
+            <PrimaryButton disabled className="w-full">
+              No Application Link Available
+            </PrimaryButton>
           )}
         </div>
       </Modal>

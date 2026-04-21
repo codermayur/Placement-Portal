@@ -18,19 +18,19 @@ const validatePayload = (payload) => {
     "announcementHeading",
     "type",
     "description",
-    "eligibilityCriteria",
     "lastDate",
-    "applicationLink",
     "department",
   ];
   for (const field of required) {
     if (!payload[field]) return `${field} is required`;
   }
-  try {
-    const parsed = new URL(payload.applicationLink);
-    if (!["http:", "https:"].includes(parsed.protocol)) return "applicationLink must start with http/https";
-  } catch {
-    return "applicationLink must be a valid URL";
+  if (payload.applicationLink) {
+    try {
+      const parsed = new URL(payload.applicationLink);
+      if (!["http:", "https:"].includes(parsed.protocol)) return "applicationLink must start with http/https";
+    } catch {
+      return "applicationLink must be a valid URL";
+    }
   }
   if ((payload.description || "").length > 10000) return "description must be <= 10000 characters";
   const selectedDate = new Date(payload.lastDate);
@@ -99,7 +99,7 @@ const createOpportunity = async (req, res) => {
       ...req.body,
       announcementHeading: sanitizeString(req.body.announcementHeading),
       description: sanitizeString(req.body.description),
-      applicationLink: sanitizeString(req.body.applicationLink),
+      applicationLink: req.body.applicationLink ? sanitizeString(req.body.applicationLink) : "",
       department: sanitizeString(req.body.department),
       type: sanitizeString(req.body.type),
       eligibilityCriteria: Array.isArray(req.body.eligibilityCriteria)
@@ -114,12 +114,15 @@ const createOpportunity = async (req, res) => {
     }
     payload.status = deriveStatusFromLastDate(payload.lastDate);
     const validationError = validatePayload(payload);
-    if (validationError) return fail(res, 400, validationError);
+    if (validationError) {
+      console.error('[OPPORTUNITIES][VALIDATION_ERROR]', { payloadKeys: Object.keys(payload), error: validationError });
+      return fail(res, 400, validationError);
+    }
     const opportunity = await Opportunity.create({ ...payload, createdBy: req.user.email || String(req.user._id) });
     return ok(res, normalizeOpportunity(opportunity), 201);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error("[OPPORTUNITIES][CREATE]", { body: req.body, error: error.message });
+    console.error("[OPPORTUNITIES][CREATE]", { body: req.body, payload, error: error.message });
     return fail(res, 400, "Failed to create opportunity", error.message);
   }
 };
@@ -140,7 +143,7 @@ const updateOpportunity = async (req, res) => {
       ...req.body,
       announcementHeading: sanitizeString(req.body.announcementHeading),
       description: sanitizeString(req.body.description),
-      applicationLink: sanitizeString(req.body.applicationLink),
+      applicationLink: req.body.applicationLink ? sanitizeString(req.body.applicationLink) : "",
       department: sanitizeString(req.body.department),
       type: sanitizeString(req.body.type),
       eligibilityCriteria: Array.isArray(req.body.eligibilityCriteria)
@@ -181,7 +184,11 @@ const deleteOpportunity = async (req, res) => {
 const getActiveOpportunities = async (req, res) => {
   await syncOpportunityStatuses();
   const filter = { status: "active" };
-  if (req.user.role === "student" || req.user.role === "faculty") {
+
+  if (req.user.role === "faculty") {
+    // Faculty can only see opportunities they created
+    filter.createdBy = req.user.email || String(req.user._id);
+  } else if (req.user.role === "student") {
     filter.$or = [
       { department: OPPORTUNITY_BROADCAST_ALL },
       { department: { $regex: new RegExp(`\\b${req.user.department}\\b`) } }
@@ -195,7 +202,11 @@ const getActiveOpportunities = async (req, res) => {
 const getArchivedOpportunities = async (req, res) => {
   await syncOpportunityStatuses();
   const filter = { status: "archived" };
-  if (req.user.role === "student" || req.user.role === "faculty") {
+
+  if (req.user.role === "faculty") {
+    // Faculty can only see opportunities they created
+    filter.createdBy = req.user.email || String(req.user._id);
+  } else if (req.user.role === "student") {
     filter.$or = [
       { department: OPPORTUNITY_BROADCAST_ALL },
       { department: { $regex: new RegExp(`\\b${req.user.department}\\b`) } }

@@ -16,9 +16,9 @@ const PostOpportunityPage = () => {
       description: "",
       eligibilityCriteria: [],
       lastDate: "",
-      applicationLink: "",
       department: user?.department || "",
       technicalSkills: [],
+      applicationLink: "",
     }),
     [user?.department]
   );
@@ -34,13 +34,23 @@ const PostOpportunityPage = () => {
     const hasEligibility = Array.isArray(form.eligibilityCriteria)
       ? form.eligibilityCriteria.length > 0
       : Boolean(form.eligibilityCriteria);
-    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
+    if (!form.announcementHeading || !form.type || !form.description || !hasEligibility || !form.lastDate) {
       setError("Please fill all required opportunity fields.");
       return;
     }
     setLoading(true);
     try {
-      await api.post("/opportunities", form);
+      const payload = {
+        ...form,
+        announcementHeading: form.announcementHeading.trim(),
+        description: form.description.trim(),
+        department: form.department,
+        applicationLink: form.applicationLink || "",
+        eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
+          ? form.eligibilityCriteria.filter(Boolean).join(", ")
+          : (form.eligibilityCriteria || "").trim(),
+      };
+      await api.post("/opportunities", payload);
       setForm(initial);
       setMessage("Opportunity created successfully.");
       toast.success("Opportunity created");

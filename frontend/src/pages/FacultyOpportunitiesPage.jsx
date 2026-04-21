@@ -22,9 +22,9 @@ const getInitialForm = (facultyDepartment) => ({
   description: "",
   eligibilityCriteria: [],
   lastDate: "",
-  applicationLink: "",
   department: facultyDepartment || "",
   technicalSkills: [],
+  applicationLink: "",
 });
 
 const normalizeToForm = (item) => ({
@@ -36,12 +36,17 @@ const normalizeToForm = (item) => ({
     .map((entry) => entry.trim())
     .filter(Boolean),
   lastDate: item.lastDate ? new Date(item.lastDate).toISOString().slice(0, 10) : "",
-  applicationLink: item.applicationLink || "",
   department: item.department || "",
   technicalSkills: Array.isArray(item.technicalSkills) ? item.technicalSkills : [],
+  applicationLink: item.applicationLink || "",
 });
 
 const isArchived = (item) => new Date(item.lastDate).getTime() < Date.now();
+
+const isOwner = (opportunity, userEmail) => {
+  if (!opportunity || !userEmail) return false;
+  return String(opportunity.createdBy) === String(userEmail);
+};
 
 const isValidHttpUrl = (value) => {
   try {
@@ -118,23 +123,23 @@ const FacultyOpportunitiesPage = () => {
   const validateForm = () => {
     const trimmedHeading = form.announcementHeading.trim();
     const trimmedDescription = form.description.trim();
-    const trimmedLink = form.applicationLink.trim();
     const selectedDate = new Date(form.lastDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
 
-    if (!trimmedHeading || !form.type || !trimmedDescription || !form.lastDate || !trimmedLink) {
-      return "Please fill all required fields";
+    const hasEligibility = Array.isArray(form.eligibilityCriteria)
+      ? form.eligibilityCriteria.length > 0
+      : Boolean(form.eligibilityCriteria?.trim?.());
+
+    if (!trimmedHeading || !form.type || !trimmedDescription || !form.lastDate || !hasEligibility) {
+      return "Please fill all required fields (including eligibility criteria)";
     }
     if (trimmedDescription.length > 10000) {
       return "Description must be less than 10000 characters";
     }
     if (selectedDate < today) {
       return "Last date cannot be in the past";
-    }
-    if (!isValidHttpUrl(/^https?:\/\//i.test(trimmedLink) ? trimmedLink : `https://${trimmedLink}`)) {
-      return "Please enter a valid URL";
     }
     return "";
   };
@@ -143,8 +148,8 @@ const FacultyOpportunitiesPage = () => {
     ...form,
     announcementHeading: form.announcementHeading.trim(),
     description: form.description.trim(),
-    applicationLink: /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink.trim() : `https://${form.applicationLink.trim()}`,
     department: form.department,
+    applicationLink: form.applicationLink || "",
     eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
       ? form.eligibilityCriteria.filter(Boolean).join(", ")
       : (form.eligibilityCriteria || "").trim(),
@@ -190,6 +195,11 @@ const FacultyOpportunitiesPage = () => {
 
   const handleEdit = async (item) => {
     const id = item.id || item._id;
+    if (!isOwner(item, user?.email)) {
+      setError("You don't have permission to edit this opportunity");
+      toast.error("You don't have permission to edit this opportunity");
+      return;
+    }
     if (isArchived(item)) {
       setError("Cannot edit archived opportunities");
       toast.error("Cannot edit archived opportunities");
@@ -202,6 +212,13 @@ const FacultyOpportunitiesPage = () => {
 
   const handleDelete = (item) => {
     const id = item.id || item._id;
+
+    if (!isOwner(item, user?.email)) {
+      setError("You don't have permission to delete this opportunity");
+      toast.error("You don't have permission to delete this opportunity");
+      return;
+    }
+
     toast.custom(
       (t) => (
         <div className="w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
@@ -278,18 +295,21 @@ const FacultyOpportunitiesPage = () => {
           </div>
         ) : sorted.length ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {sorted.map((item) => (
-              <OpportunityCard
-                key={item.id || item._id}
-                opportunity={item}
-                canManage
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                editDisabled={isArchived(item)}
-                editLoading={Boolean(editingId && (item.id || item._id) === editingId && saving)}
-                deleteLoading={deletingId === (item.id || item._id)}
-              />
-            ))}
+            {sorted.map((item) => {
+              const canManageItem = isOwner(item, user?.email);
+              return (
+                <OpportunityCard
+                  key={item.id || item._id}
+                  opportunity={item}
+                  canManage={canManageItem}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  editDisabled={isArchived(item) || !canManageItem}
+                  editLoading={Boolean(editingId && (item.id || item._id) === editingId && saving)}
+                  deleteLoading={deletingId === (item.id || item._id)}
+                />
+              );
+            })}
           </div>
         ) : (
           <EmptyState title="No opportunities yet" subtitle="Create one using the form above." />

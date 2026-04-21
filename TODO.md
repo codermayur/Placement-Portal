@@ -1,18 +1,21 @@
-# StudentProfileForm.jsx Error Fixes - TODO
+# Fix POST /api/opportunities 400 Error
 
-## Plan Implementation Steps (Approved)
+Status: In Progress
 
-**Step 1: [PENDING] Create TODO.md** - Track progress
-**Step 2: [PENDING] Fix all issues in StudentProfileForm.jsx via edit_file**
-   - Rename academiInfo → academicInfo (global)
-   - Fix borderb-2 → border-b-2
-   - Add missing } before export
-   - Fix Section 2 JSX structure
-   - Clean up final JSX
+**Diagnosis:**
+- Missing/invalid `applicationLink` (required in schema but no frontend field)
+- Possible empty `eligibilityCriteria` failing validation
 
-**Step 3: [PENDING] Verify no syntax errors (read_file + manual check)**
-**Step 4: [PENDING] Test in browser (`npm run dev` in frontend/, visit /student/profile)**
-**Step 5: [PENDING] Update TODO.md with completion status**
-**Step 6: [PENDING] attempt_completion**
+**Completed:**
+- [x] Created TODO.md
+- [x] Updated `backend/src/models/Opportunity.js`: Made `applicationLink` optional
+- [x] Updated `backend/src/controllers/opportunityController.js`: Removed `eligibilityCriteria` from strict required, added detailed logging
 
-Updated after each step.
+**Remaining Steps:**
+1. Restart backend server to apply changes
+2. Test POST /api/opportunities with valid payload (curl or form)
+3. Check server console for logs if still 400
+4. Frontend test form submission (ensure JSON body, auth token)
+5. attempt_completion
+
+**Updated TODO after each step.**

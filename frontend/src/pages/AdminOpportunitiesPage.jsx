@@ -13,9 +13,9 @@ const initial = {
   description: "",
   eligibilityCriteria: [],
   lastDate: "",
-  applicationLink: "",
   department: OPPORTUNITY_BROADCAST_ALL,
   technicalSkills: [],
+  applicationLink: "",
 };
 
 const AdminOpportunitiesPage = () => {
@@ -55,15 +55,23 @@ const AdminOpportunitiesPage = () => {
     const hasEligibility = Array.isArray(form.eligibilityCriteria)
       ? form.eligibilityCriteria.length > 0
       : Boolean(form.eligibilityCriteria);
-    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
+    if (!form.announcementHeading || !form.type || !form.description || !hasEligibility || !form.lastDate || !form.department) {
       setError("Please fill all required fields.");
       return;
     }
     setSaving(true);
     try {
-      const normalizedLink =
-        /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink : `https://${form.applicationLink}`;
-      await api.post("/opportunities", { ...form, applicationLink: normalizedLink });
+      const payload = {
+        ...form,
+        announcementHeading: form.announcementHeading.trim(),
+        description: form.description.trim(),
+        department: form.department,
+        applicationLink: form.applicationLink || "",
+        eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
+          ? form.eligibilityCriteria.filter(Boolean).join(", ")
+          : (form.eligibilityCriteria || "").trim(),
+      };
+      await api.post("/opportunities", payload);
       resetForm();
       await load();
       setMessage("Opportunity created successfully.");
@@ -93,8 +101,9 @@ const AdminOpportunitiesPage = () => {
       description: item.description || "",
       eligibilityCriteria: item.eligibilityCriteria ? item.eligibilityCriteria.split(", ").filter(Boolean) : [],
       lastDate: item.lastDate ? new Date(item.lastDate).toISOString().split("T")[0] : "",
-      applicationLink: item.applicationLink || "",
       department: item.department || OPPORTUNITY_BROADCAST_ALL,
+      technicalSkills: Array.isArray(item.technicalSkills) ? item.technicalSkills : [],
+      applicationLink: item.applicationLink || "",
     });
     setEditingId(id);
   };
@@ -106,15 +115,23 @@ const AdminOpportunitiesPage = () => {
     const hasEligibility = Array.isArray(form.eligibilityCriteria)
       ? form.eligibilityCriteria.length > 0
       : Boolean(form.eligibilityCriteria);
-    if (!form.announcementHeading || !form.description || !hasEligibility || !form.lastDate || !form.applicationLink) {
+    if (!form.announcementHeading || !form.type || !form.description || !hasEligibility || !form.lastDate || !form.department) {
       setError("Please fill all required fields.");
       return;
     }
     setSaving(true);
     try {
-      const normalizedLink =
-        /^https?:\/\//i.test(form.applicationLink) ? form.applicationLink : `https://${form.applicationLink}`;
-      await updateOpportunity(editingId, { ...form, applicationLink: normalizedLink });
+      const payload = {
+        ...form,
+        announcementHeading: form.announcementHeading.trim(),
+        description: form.description.trim(),
+        department: form.department,
+        applicationLink: form.applicationLink || "",
+        eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
+          ? form.eligibilityCriteria.filter(Boolean).join(", ")
+          : (form.eligibilityCriteria || "").trim(),
+      };
+      await updateOpportunity(editingId, payload);
       resetForm();
       await load();
       setMessage("Opportunity updated successfully.");
