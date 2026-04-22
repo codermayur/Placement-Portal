@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import PasswordInput from "../components/PasswordInput";
 import { PrimaryButton, SectionTitle, StatusMessage } from "../components/ui";
 import { DEPARTMENTS } from "../constants/departments";
@@ -61,7 +62,8 @@ const ManageFacultyPage = () => {
   };
 
   return (
-    <Layout role="Admin">
+    <>
+      <Layout role="Admin">
       <SectionTitle title="Admin User Management" subtitle="Create faculty and admin accounts with institute-only email policy." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
@@ -90,6 +92,8 @@ const ManageFacultyPage = () => {
         </div>
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 

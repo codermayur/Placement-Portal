@@ -8,6 +8,7 @@ import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
 import { DEPARTMENTS } from "../constants/departments";
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 const RegisterPage = () => {
   const [step, setStep] = useState(1);
@@ -174,6 +175,7 @@ const RegisterPage = () => {
         </Link>
       </Motion.div>
       </div>
+      <Footer />
     </>
   );
 };

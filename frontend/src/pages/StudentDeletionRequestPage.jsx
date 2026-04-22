@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import { PrimaryButton, SectionTitle, StatusMessage } from "../components/ui";
 
 const StudentDeletionRequestPage = () => {
@@ -31,7 +32,8 @@ const StudentDeletionRequestPage = () => {
   };
 
   return (
-    <Layout role="Student">
+    <>
+      <Layout role="Student">
       <SectionTitle title="Request Account Deletion" subtitle="Send your account deletion request to admin." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
@@ -48,6 +50,8 @@ const StudentDeletionRequestPage = () => {
         </PrimaryButton>
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 

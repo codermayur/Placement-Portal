@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiData, extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityForm from "../components/OpportunityForm";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
@@ -189,7 +190,8 @@ const AdminOpportunitiesPage = () => {
   const isArchived = (item) => item.status === "archived" || new Date(item.lastDate).getTime() < Date.now();
 
   return (
-    <Layout role="Admin">
+    <>
+      <Layout role="Admin">
       <SectionTitle title="Opportunities" subtitle="Create, edit, and manage opportunities." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
@@ -226,6 +228,8 @@ const AdminOpportunitiesPage = () => {
         )}
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 

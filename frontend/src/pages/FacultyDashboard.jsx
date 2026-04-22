@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
 import { useOpportunities } from "../context/OpportunitiesContext";
@@ -102,7 +103,8 @@ const FacultyDashboard = () => {
   const allOpportunities = useMemo(() => [...active, ...archive], [active, archive]);
 
   return (
-    <Layout role="Faculty">
+    <>
+      <Layout role="Faculty">
       <SectionTitle title="Faculty Dashboard" subtitle="Overview of your department opportunities." />
       <StatusMessage type="error" message={error} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -138,6 +140,8 @@ const FacultyDashboard = () => {
         )}
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 

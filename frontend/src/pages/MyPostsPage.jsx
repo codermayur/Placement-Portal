@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiData, extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityCard from "../components/OpportunityCard";
 import OpportunityForm from "../components/OpportunityForm";
 import { EmptyState, SectionTitle, Spinner, StatusMessage, Modal } from "../components/ui";
@@ -257,6 +258,7 @@ const MyPostsPage = () => {
         />
       </Modal>
     </Layout>
+    <Footer />
   );
 };
 

@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { extractApiError } from "../api";
 import { applyToOpportunity } from "../services/opportunitiesService";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -75,8 +76,9 @@ const StudentDashboard = ({ role = "Student" }) => {
   );
 
   return (
-    <Layout role={role}>
-      <section className="space-y-4 sm:space-y-6">
+    <>
+      <Layout role={role}>
+        <section className="space-y-4 sm:space-y-6">
           <SectionTitle title={`${role} Dashboard`} subtitle="Explore active opportunities and track archived postings." />
           <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 xl:grid-cols-2">
             <input
@@ -111,7 +113,9 @@ const StudentDashboard = ({ role = "Student" }) => {
             </>
           )}
         </section>
-    </Layout>
+      </Layout>
+      <Footer />
+    </>
   );
 };
 

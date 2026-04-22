@@ -6,9 +6,9 @@ const Logo = ({ className = "" }) => (
     className={`inline-flex items-center justify-center flex-shrink-0 ${className}`}
     aria-label="Placement Portal Home"
   >
-    <div className="h-10 xs:h-12 sm:h-14 md:h-16 aspect-video bg-transparent flex items-center justify-center">
+    <div className="h-8 xs:h-9 sm:h-10 lg:h-12 aspect-square bg-transparent flex items-center justify-center flex-shrink-0">
       <img
-        src="/logo.png"
+        src="/vsit.png"
         alt="Placement Portal Logo"
         className="h-full w-full object-contain hover:opacity-80 transition-opacity duration-200"
       />

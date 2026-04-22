@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityCard from "../components/OpportunityCard";
 import OpportunityForm from "../components/OpportunityForm";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
@@ -273,7 +274,8 @@ const FacultyOpportunitiesPage = () => {
   );
 
   return (
-    <Layout role="Faculty">
+    <>
+      <Layout role="Faculty">
       <SectionTitle title="Faculty Opportunities" subtitle="Create, edit, and delete opportunities owned by you." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
@@ -321,6 +323,8 @@ const FacultyOpportunitiesPage = () => {
         </div>
       ) : null}
     </Layout>
+    <Footer />
+    </>
   );
 };
 

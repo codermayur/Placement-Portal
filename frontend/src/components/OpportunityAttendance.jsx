@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "../api";
 import { useOpportunities } from "../context/OpportunitiesContext";
 import { getSocket } from "../utils/socket";
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Spinner, StatusMessage } from "./ui";
 
 const STAGES = [
@@ -21,6 +21,21 @@ const OpportunityAttendance = ({ opportunityId, activeStages }) => {
   const [error, setError] = useState("");
   const [optimisticUpdates, setOptimisticUpdates] = useState({});
   const socket = getSocket();
+
+  // Determine the current stage (most recently activated)
+  const getCurrentStage = () => {
+    if (!activeStages || activeStages.length === 0) return null;
+    // Find the last stage in STAGES order that's in activeStages
+    for (let i = STAGES.length - 1; i >= 0; i--) {
+      if (activeStages.includes(STAGES[i])) {
+        return STAGES[i];
+      }
+    }
+    return null;
+  };
+
+  const currentStage = getCurrentStage();
+  const isReadOnly = selectedStage && currentStage && selectedStage !== currentStage;
 
   // Fetch attendance when stage is selected
   useEffect(() => {
@@ -150,22 +165,30 @@ const OpportunityAttendance = ({ opportunityId, activeStages }) => {
           {STAGES.map((stage) => {
             const isActive = stage === selectedStage;
             const isEnabled = activeStages.includes(stage);
+            const isCurrent = stage === currentStage;
+            const isPrevious = isEnabled && !isCurrent;
 
             return (
-              <button
-                key={stage}
-                onClick={() => isEnabled && setSelectedStage(stage)}
-                disabled={!isEnabled}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : isEnabled
-                    ? "bg-slate-100 text-slate-800 hover:bg-slate-200"
-                    : "bg-slate-50 text-slate-400 cursor-not-allowed opacity-50"
-                }`}
-              >
-                {stage}
-              </button>
+              <div key={stage} className="relative">
+                <button
+                  onClick={() => isEnabled && setSelectedStage(stage)}
+                  disabled={!isEnabled}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-md"
+                      : isEnabled
+                      ? "bg-slate-100 text-slate-800 hover:bg-slate-200"
+                      : "bg-slate-50 text-slate-400 cursor-not-allowed opacity-50"
+                  }`}
+                >
+                  {stage}
+                </button>
+                {isPrevious && (
+                  <span className="absolute -top-2 -right-2 px-2 py-0.5 text-xs font-semibold bg-orange-500 text-white rounded-full">
+                    Closed
+                  </span>
+                )}
+              </div>
             );
           })}
         </div>
@@ -176,6 +199,113 @@ const OpportunityAttendance = ({ opportunityId, activeStages }) => {
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
           <p className="text-sm text-slate-600">Select a stage above to view attendance.</p>
         </div>
+      ) : isReadOnly ? (
+        <>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+            <AlertCircle size={18} className="mt-0.5 text-amber-600 flex-shrink-0" />
+            <p className="text-sm text-amber-800">
+              <strong>Previous Stage:</strong> This stage is now closed for editing. View the final attendance records below.
+            </p>
+          </div>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner />
+            </div>
+          ) : attendanceList.length === 0 ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-8 text-center">
+              <p className="text-sm text-slate-600">No applicants found for this stage.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary Stats */}
+              <div className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <p className="text-slate-600">Total</p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.total}</p>
+                  </div>
+                  <div>
+                    <p className="text-emerald-600">Present</p>
+                    <p className="text-lg font-semibold text-emerald-700">{stats.present}</p>
+                  </div>
+                  <div>
+                    <p className="text-rose-600">Absent</p>
+                    <p className="text-lg font-semibold text-rose-700">{stats.absent}</p>
+                  </div>
+                  <div>
+                    <p className="text-amber-600">Pending</p>
+                    <p className="text-lg font-semibold text-amber-700">{stats.pending}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Read-Only Applicant List */}
+              <div className="space-y-2">
+                {attendanceList.map((record) => {
+                  const student = record.studentId;
+                  const currentStatus = record.status;
+
+                  const statusDisplay = {
+                    present: { label: "Present", color: "bg-emerald-50 border-emerald-200" },
+                    absent: { label: "Absent", color: "bg-rose-50 border-rose-200" },
+                    pending: { label: "Pending", color: "bg-amber-50 border-amber-200" },
+                  }[currentStatus] || { label: "Unknown", color: "bg-slate-50 border-slate-200" };
+
+                  return (
+                    <div
+                      key={record._id}
+                      className={`rounded-lg border ${statusDisplay.color} bg-white p-4`}
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Student Avatar */}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm">
+                          {student.name?.charAt(0)?.toUpperCase()}
+                        </div>
+
+                        {/* Student Info */}
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-slate-900">
+                            {student.name}
+                          </h4>
+                          <p className="text-xs text-slate-600">
+                            {student.studentId} • {student.department}
+                          </p>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2">
+                          {currentStatus === "present" && (
+                            <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-xs font-medium border border-emerald-300">
+                              <CheckCircle size={14} />
+                              {statusDisplay.label}
+                            </div>
+                          )}
+                          {currentStatus === "absent" && (
+                            <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-100 text-rose-700 text-xs font-medium border border-rose-300">
+                              <XCircle size={14} />
+                              {statusDisplay.label}
+                            </div>
+                          )}
+                          {currentStatus === "pending" && (
+                            <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-medium border border-amber-300">
+                              <Clock size={14} />
+                              {statusDisplay.label}
+                            </div>
+                          )}
+                          {record.markedAt && (
+                            <p className="text-xs text-slate-500">
+                              {new Date(record.markedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       ) : isLoading ? (
         <div className="flex justify-center py-8">
           <Spinner />

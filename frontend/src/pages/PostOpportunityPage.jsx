@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import toast from "react-hot-toast";
 import api, { extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityForm from "../components/OpportunityForm";
 import { SectionTitle, StatusMessage } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
@@ -76,6 +77,7 @@ const PostOpportunityPage = () => {
         loading={loading}
       />
     </Layout>
+    <Footer />
   );
 };
 

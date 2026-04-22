@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 const LoginPage = () => {
   const [form, setForm] = useState({ role: "student", identifier: "", password: "" });
@@ -113,6 +114,7 @@ const LoginPage = () => {
         </div>
       </Motion.form>
       </div>
+      <Footer />
     </>
   );
 };

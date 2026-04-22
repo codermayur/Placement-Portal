@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import PasswordInput from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import api, { extractApiData, extractApiError } from "../api";
@@ -67,7 +68,8 @@ const ProfilePage = () => {
   };
 
   return (
-    <Layout role={role}>
+    <>
+      <Layout role={role}>
       <SectionTitle title="Profile & Security" subtitle="Manage profile information, access actions, and account security." />
       <StatusMessage message={message} />
       <StatusMessage type="error" message={error} />
@@ -142,6 +144,8 @@ const ProfilePage = () => {
         </section>
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 

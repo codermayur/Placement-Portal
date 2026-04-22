@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import api, { extractApiData, extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import StudentProfileForm from "../components/StudentProfileForm";
 import { PrimaryButton, SectionTitle, StatusMessage } from "../components/ui";
 
@@ -273,7 +274,8 @@ const StudentProfilePage = () => {
 
   return (
     <ProfileErrorBoundary>
-      <Layout role="Student">
+      <>
+        <Layout role="Student">
         <section className="space-y-6">
           {/* Header */}
           <div className="space-y-2">
@@ -330,7 +332,9 @@ const StudentProfilePage = () => {
             <p>Your profile information is securely stored and only shared with authorized recruiters and your institute.</p>
           </div>
         </section>
-      </Layout>
+        </Layout>
+        <Footer />
+      </>
     </ProfileErrorBoundary>
   );
 };

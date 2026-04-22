@@ -4,6 +4,7 @@ import api, { extractApiError } from "../api";
 import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
 import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 const ForgotPasswordPage = () => {
   const [form, setForm] = useState({
@@ -119,6 +120,7 @@ const ForgotPasswordPage = () => {
         </Link>
       </div>
       </div>
+      <Footer />
     </>
   );
 };

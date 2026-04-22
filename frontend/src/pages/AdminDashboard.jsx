@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api, { extractApiData, extractApiError } from "../api";
 import Layout from "../components/Layout";
+import Footer from "../components/Footer";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
 import { getApplicantsCount, deleteOpportunity, updateOpportunity } from "../services/opportunitiesService";
@@ -104,7 +105,8 @@ const AdminDashboard = () => {
   const allOpportunities = useMemo(() => [...active, ...archive], [active, archive]);
 
   return (
-    <Layout role="Admin">
+    <>
+      <Layout role="Admin">
       <SectionTitle title="Admin Dashboard" subtitle="Overview of all opportunities." />
       <StatusMessage type="error" message={error} />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -140,6 +142,8 @@ const AdminDashboard = () => {
         )}
       </div>
     </Layout>
+    <Footer />
+    </>
   );
 };
 
