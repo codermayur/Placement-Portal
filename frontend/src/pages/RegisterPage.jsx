@@ -51,10 +51,9 @@ const RegisterPage = () => {
     try {
       const response = await api.post("/auth/register", form);
       const data = extractApiData(response);
-      if (import.meta.env.DEV && data?.otp) {
-        setMsg(`✅ Account created (pending verification). Dev OTP: ${data.otp}`);
-      } else if (data?.otpDelivery === "failed" && data?.otp) {
-        setMsg(`⚠️ Account created but email failed. Use OTP: ${data.otp}`);
+      // ⭐ Never display OTP to user for security
+      if (data?.otpDelivery === "failed") {
+        setMsg("⚠️ Email delivery failed. Please contact support.");
       } else {
         setMsg("✅ Account created (pending verification). Check your email for OTP.");
       }

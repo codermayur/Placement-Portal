@@ -54,25 +54,40 @@ const registerStudent = async (req, res) => {
       return res.status(429).json({ message: "Too many OTP requests. Try again in a minute." });
     }
 
+    // Check if student already registered and verified
     const existing = await User.findOne({ studentId });
     if (existing) {
       return fail(res, 400, "Student already registered");
     }
 
+    // Hash password for storage in OTP document
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ name, studentId, department, role: "student", email, phone, password: hashedPassword, isVerified: false });
 
+    // Generate OTP
     const otp = `${crypto.randomInt(100000, 1000000)}`;
+
+    // Store OTP with registration data (user NOT created in DB yet)
     const otpDoc = await Otp.findOneAndUpdate(
       { studentId, purpose: "registration" },
-      { studentId, email, role: "student", purpose: "registration", otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      {
+        studentId,
+        email,
+        role: "student",
+        purpose: "registration",
+        otp,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        registrationData: {
+          name,
+          phone,
+          department,
+          password: hashedPassword,
+        },
+      },
       { upsert: true, new: true }
     );
 
     // Ensure OTP was created before proceeding
     if (!otpDoc) {
-      // If OTP creation failed, delete the user to maintain data consistency
-      await User.deleteOne({ _id: newUser._id });
       return fail(res, 500, "Failed to create OTP. Please try again.");
     }
 
@@ -87,12 +102,14 @@ const registerStudent = async (req, res) => {
       }
     }
 
+    console.log(`[AUTH][REGISTER] Registration initiated for ${studentId} (${email}). OTP created (not verified yet).`);
+
+    // ⭐ NEVER return OTP in response for security
     return ok(
       res,
       {
-        message: otpDelivery === "sent" ? "OTP sent successfully" : "OTP generated, but email delivery failed",
+        message: otpDelivery === "sent" ? "OTP sent successfully. Check your email." : "OTP generated, but email delivery failed. Please try again.",
         otpDelivery,
-        ...(process.env.NODE_ENV !== "production" ? { otp } : {}),
         ...(otpDeliveryError ? { otpDeliveryError } : {}),
       },
       201
@@ -106,28 +123,53 @@ const verifyOtp = async (req, res) => {
   try {
     const studentId = sanitizeString(req.body.studentId);
     const otp = sanitizeString(req.body.otp);
+
+    console.log(`[AUTH][VERIFY_OTP] Verifying OTP for studentId: ${studentId}`);
+
     const otpDoc = await Otp.findOne({ studentId, purpose: "registration" });
-    if (!otpDoc || otpDoc.otp !== otp || otpDoc.expiresAt < new Date()) {
-      return fail(res, 400, "Invalid or expired OTP");
+    if (!otpDoc) {
+      console.log(`[AUTH][VERIFY_OTP] No OTP document found for studentId: ${studentId}`);
+      return fail(res, 400, "Registration not found. Please register first.");
     }
 
-    // Verify student exists and ensure it's actually a student role
-    const user = await User.findOne({ studentId, role: "student", isVerified: false });
-    if (!user) {
-      return fail(res, 400, "Student registration not found or already verified");
+    if (otpDoc.otp !== otp) {
+      console.log(`[AUTH][VERIFY_OTP] OTP mismatch for studentId: ${studentId}`);
+      return fail(res, 400, "Invalid OTP");
     }
 
-    // Mark as verified
-    const updatedUser = await User.findOneAndUpdate(
-      { studentId, role: "student" },
-      { isVerified: true },
-      { new: true }
-    );
+    if (otpDoc.expiresAt < new Date()) {
+      console.log(`[AUTH][VERIFY_OTP] OTP expired for studentId: ${studentId}`);
+      return fail(res, 400, "OTP has expired");
+    }
 
+    // ⭐ OTP verified! Now create the user in database
+    const registrationData = otpDoc.registrationData;
+    if (!registrationData || !registrationData.name || !registrationData.phone || !registrationData.department || !registrationData.password) {
+      console.error(`[AUTH][VERIFY_OTP] Missing registration data for studentId: ${studentId}`);
+      return fail(res, 500, "Registration data corrupted. Please register again.");
+    }
+
+    // Create user with isVerified: true
+    const user = await User.create({
+      name: registrationData.name,
+      studentId,
+      department: registrationData.department,
+      role: "student",
+      email: otpDoc.email,
+      phone: registrationData.phone,
+      password: registrationData.password,
+      isVerified: true,
+    });
+
+    console.log(`[AUTH][VERIFY_OTP] ✓ User created successfully for studentId: ${studentId}, userId: ${user._id}`);
+
+    // Delete OTP document after successful verification
     await Otp.deleteOne({ _id: otpDoc._id });
-    const token = signToken(updatedUser._id);
-    return ok(res, { token, user: sanitizeUserResponse(updatedUser) });
+
+    const token = signToken(user._id);
+    return ok(res, { token, user: sanitizeUserResponse(user) });
   } catch (error) {
+    console.error(`[AUTH][VERIFY_OTP][ERROR]`, error.message);
     return fail(res, 500, "OTP verification failed", error.message);
   }
 };

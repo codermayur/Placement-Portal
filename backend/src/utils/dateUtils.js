@@ -119,8 +119,14 @@ const isDateInPast = (date) => {
 
 /**
  * Determine opportunity status based on lastDate (timezone-safe)
- * Returns "active" if lastDate >= today, "archived" if lastDate < today
- * Comparison is done at day level, ignoring time components
+ *
+ * ⭐ KEY LOGIC:
+ * An opportunity with lastDate = 2026-04-22 means:
+ * - ACTIVE: Entire day of 2026-04-22 (from 00:00:00 to 23:59:59)
+ * - ARCHIVED: Starting 2026-04-23 at 00:00:00 onwards
+ *
+ * Implementation: today > lastDate → archived (day level comparison)
+ * This ensures oppis only archived AFTER lastDate has completely passed.
  *
  * @param {Date|string|null} lastDate - The opportunity's last date
  * @returns {string} "active" or "archived"
@@ -156,17 +162,20 @@ const getStatusFromLastDate = (lastDate) => {
   // Normalize to start of day (local timezone)
   const lastNormalized = new Date(lastParsed.getFullYear(), lastParsed.getMonth(), lastParsed.getDate());
 
+  // ⭐ CRITICAL COMPARISON: Only archive if today is AFTER lastDate (strictly greater than)
+  // This ensures the opportunity remains active through the ENTIRE lastDate
   const status = todayNormalized > lastNormalized ? "archived" : "active";
 
   // Detailed logging for debugging
-  console.log(`[DATE_UTILS] getStatusFromLastDate:`, {
+  console.log(`[DATE_UTILS] getStatusFromLastDate (⭐ AFTER last date only):`, {
     rawLastDate: rawDateLog,
     todayNormalized: todayNormalized.toISOString().split("T")[0],
     lastNormalized: lastNormalized.toISOString().split("T")[0],
     todayTime: todayNormalized.getTime(),
     lastTime: lastNormalized.getTime(),
-    comparison: todayNormalized > lastNormalized ? "today > lastDate (archived)" : "today <= lastDate (active)",
-    result: status
+    comparison: `today (${todayNormalized.toISOString().split("T")[0]}) > lastDate (${lastNormalized.toISOString().split("T")[0]})? ${todayNormalized > lastNormalized}`,
+    result: status,
+    meaning: status === "archived" ? "Today is AFTER the last date" : "Today IS or BEFORE the last date (opp still active)"
   });
 
   return status;
