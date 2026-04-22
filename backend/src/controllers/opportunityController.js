@@ -4,7 +4,12 @@ const { sanitizeString } = require("../utils/sanitize");
 const { ok, fail } = require("../utils/apiResponse");
 const { OPPORTUNITY_BROADCAST_ALL, isValidOpportunityDepartment } = require("../constants/departments");
 
-const deriveStatusFromLastDate = (lastDate) => (new Date(lastDate) < new Date() ? "archived" : "active");
+const deriveStatusFromLastDate = (lastDate) =>
+  new Date(lastDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
+    ? "archived"
+    : "active";
+
+/*const deriveStatusFromLastDate = (lastDate) => (new Date(lastDate) < new Date() ? "archived" : "active");*/
 
 const syncOpportunityStatuses = async () => {
   const now = new Date();

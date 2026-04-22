@@ -76,17 +76,17 @@ const StudentDashboard = ({ role = "Student" }) => {
 
   return (
     <Layout role={role}>
-      <section className="space-y-6">
+      <section className="space-y-4 sm:space-y-6">
           <SectionTitle title={`${role} Dashboard`} subtitle="Explore active opportunities and track archived postings." />
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 xl:grid-cols-2">
             <input
-              className="input-modern"
+              className="input-modern text-xs sm:text-base"
               placeholder="Search by heading"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <select
-              className="input-modern"
+              className="input-modern text-xs sm:text-base"
               value={sort}
               onChange={(e) => setSort(e.target.value)}
             >
@@ -100,12 +100,12 @@ const StudentDashboard = ({ role = "Student" }) => {
             <div className="py-8 flex justify-center"><Spinner /></div>
           ) : (
             <>
-          <h2 className="text-xl font-semibold text-black">Active Opportunities</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <h2 className="text-lg sm:text-xl font-semibold text-black">Active Opportunities</h2>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
 {activeView.length ? activeView.map((item) => <OpportunityCard key={item._id} opportunity={item} hasApplied={item.hasApplied ?? false} onApply={handleApply} />) : <EmptyState title="No active opportunities" subtitle="Check back later for new postings." />}
           </div>
-          <h2 className="pt-2 text-xl font-semibold text-black">Archived Opportunities</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <h2 className="pt-2 text-lg sm:text-xl font-semibold text-black">Archived Opportunities</h2>
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
 {archiveView.length ? archiveView.map((item) => <OpportunityCard key={item._id} opportunity={item} hasApplied={item.hasApplied ?? false} onApply={handleApply} />) : <EmptyState title="No archived opportunities" subtitle="Expired postings will appear here automatically." />}
           </div>
             </>

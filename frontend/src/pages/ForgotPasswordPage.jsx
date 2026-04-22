@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api, { extractApiError } from "../api";
 import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
+import Navbar from "../components/Navbar";
 
 const ForgotPasswordPage = () => {
   const [form, setForm] = useState({
@@ -71,32 +72,34 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="glass-panel w-full max-w-md space-y-4 p-6">
-        <h1 className="text-2xl font-semibold text-slate-800">Forgot Password</h1>
-        <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-          <option value="student">Student</option>
-          <option value="faculty">Faculty</option>
-          <option value="admin">Admin</option>
-        </select>
-        <input
-          className="input-modern"
-          placeholder="Registered Email"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-        />
-        {step === 2 && (
-          <>
-            <input className="input-modern" placeholder="OTP" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
-            <PasswordInput
-              placeholder="New Password"
-              value={form.newPassword}
-              onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-            />
-            <PasswordInput
-              placeholder="Confirm New Password"
-              value={form.confirmNewPassword}
-              onChange={(e) => setForm({ ...form, confirmNewPassword: e.target.value })}
+    <>
+      <Navbar />
+      <div className="flex min-h-screen items-center justify-center px-3 xs:px-4 py-8 xs:py-10">
+        <div className="glass-panel w-full max-w-md space-y-3 xs:space-y-4 p-4 xs:p-6">
+          <h1 className="text-xl xs:text-2xl font-semibold text-slate-800">Forgot Password</h1>
+          <select className="input-modern text-xs xs:text-base" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="student">Student</option>
+            <option value="faculty">Faculty</option>
+            <option value="admin">Admin</option>
+          </select>
+          <input
+            className="input-modern text-xs xs:text-base"
+            placeholder="Registered Email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          {step === 2 && (
+            <>
+              <input className="input-modern text-xs xs:text-base" placeholder="OTP" value={form.otp} onChange={(e) => setForm({ ...form, otp: e.target.value })} />
+              <PasswordInput
+                placeholder="New Password"
+                value={form.newPassword}
+                onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+              />
+              <PasswordInput
+                placeholder="Confirm New Password"
+                value={form.confirmNewPassword}
+                onChange={(e) => setForm({ ...form, confirmNewPassword: e.target.value })}
             />
           </>
         )}
@@ -111,11 +114,12 @@ const ForgotPasswordPage = () => {
             Reset Password
           </PrimaryButton>
         )}
-        <Link to="/login" className="text-sm text-indigo-600 transition-colors duration-200 ease-in-out hover:text-indigo-500">
+        <Link to="/login" className="text-xs xs:text-sm text-indigo-600 transition-colors duration-200 ease-in-out hover:text-indigo-500">
           Back to login
         </Link>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -6,6 +6,7 @@ import api, { extractApiData } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { PrimaryButton, StatusMessage } from "../components/ui";
 import PasswordInput from "../components/PasswordInput";
+import Navbar from "../components/Navbar";
 
 const LoginPage = () => {
   const [form, setForm] = useState({ role: "student", identifier: "", password: "" });
@@ -54,62 +55,65 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-indigo-200/50 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky-200/50 blur-3xl" />
-      <Motion.form
+    <>
+      <Navbar />
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-3 xs:px-4 py-8 xs:py-10">
+        <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-indigo-200/50 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky-200/50 blur-3xl" />
+        <Motion.form
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         onSubmit={submit}
-        className="glass-panel relative w-full max-w-md space-y-5 border-slate-200/80 p-7"
+        className="glass-panel relative w-full max-w-md space-y-4 xs:space-y-5 border-slate-200/80 p-4 xs:p-5 sm:p-7 rounded-2xl xs:rounded-2xl"
       >
-        <div className="mb-1 flex items-start justify-between gap-3">
-          <div>
-            <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
-              <ShieldCheck size={14} />
+        <div className="mb-1 flex flex-col items-start gap-2">
+          <div className="w-full">
+            <div className="mb-1.5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2 xs:px-2.5 py-0.5 xs:py-1 text-xs font-medium text-indigo-700">
+              <ShieldCheck size={12} className="xs:size-3.5" />
               Secure access
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900">Welcome back</h1>
-            <p className="mt-1 text-sm text-slate-600">Login to continue to your placement portal dashboard.</p>
+            <h1 className="text-xl xs:text-2xl font-semibold text-slate-900">Welcome back</h1>
+            <p className="mt-1 text-xs xs:text-sm text-slate-600">Login to continue to your placement portal dashboard.</p>
           </div>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 xs:space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Role</p>
-          <select className="input-modern" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+          <select className="input-modern text-xs xs:text-base" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
             <option value="student">Student</option><option value="faculty">Faculty</option><option value="admin">Admin</option>
           </select>
         </div>
         {form.role === "student" ? (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
+          <div className="space-y-2 xs:space-y-3">
+            <div className="space-y-1.5 xs:space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Student ID or Email</p>
-              <input className="input-modern" placeholder="Enter your student ID or email" onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
+              <input className="input-modern text-xs xs:text-base" placeholder="Enter your student ID or email" onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xs:space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>
               <PasswordInput placeholder="Enter your password" onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
+          <div className="space-y-2 xs:space-y-3">
+            <div className="space-y-1.5 xs:space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Email</p>
-              <input className="input-modern" placeholder="name.surname@vsit.edu.in" onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <input className="input-modern text-xs xs:text-base" placeholder="name.surname@vsit.edu.in" onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xs:space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">Password</p>
               <PasswordInput placeholder="Enter your password" onChange={(e) => setForm({ ...form, password: e.target.value })} />
             </div>
           </div>
         )}
-        <StatusMessage type="error" message={error} />
-        <PrimaryButton loading={loading} disabled={loading} className="w-full rounded-xl py-3">{loading ? "Logging In..." : "Login"}</PrimaryButton>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
-          <Link className="flex items-center gap-1 text-sm text-indigo-600 transition-colors duration-200 ease-in-out hover:text-indigo-500" to="/register"><UserCog size={14} />New student? Register</Link>
-          <Link className="text-sm text-indigo-600 hover:text-indigo-700" to="/forgot-password">Forgot password?</Link>
+        <StatusMessage type="error" message={error} className="text-xs xs:text-sm" />
+        <PrimaryButton loading={loading} disabled={loading} className="w-full rounded-lg xs:rounded-xl py-2.5 xs:py-3 text-xs xs:text-sm">{loading ? "Logging In..." : "Login"}</PrimaryButton>
+        <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2 border-t border-slate-200 pt-2">
+          <Link className="flex items-center gap-1 text-xs xs:text-sm text-indigo-600 transition-colors duration-200 ease-in-out hover:text-indigo-500" to="/register"><UserCog size={13} className="xs:size-3.5" />New student? Register</Link>
+          <Link className="text-xs xs:text-sm text-indigo-600 hover:text-indigo-700" to="/forgot-password">Forgot password?</Link>
         </div>
       </Motion.form>
-    </div>
+      </div>
+    </>
   );
 };
 

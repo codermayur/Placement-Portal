@@ -90,3 +90,52 @@ body {
   border-radius: 9999px;
   background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(14, 165, 233, 0.6));
 }
+
+/* Responsive Typography */
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .clamp-2 {
+    -webkit-line-clamp: 2;
+    line-height: 1.4;
+  }
+}
+
+/* Touch-friendly targets for mobile */
+@media (max-width: 640px) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Container queries for flexible layouts */
+.responsive-container {
+  width: 100%;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-container {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-container {
+    padding: 0 2rem;
+  }
+}

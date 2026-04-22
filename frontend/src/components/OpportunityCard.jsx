@@ -196,7 +196,7 @@ const OpportunityCard = ({
   return (
     <>
       <Motion.article
-whileHover={isDisabled ? {} : { y: -8 }}
+        whileHover={isDisabled ? {} : { y: -4 }}
         onClick={isDisabled ? undefined : () => setIsOpen(true)}
         onKeyDown={isDisabled ? undefined : (event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -207,18 +207,18 @@ whileHover={isDisabled ? {} : { y: -8 }}
         tabIndex={isDisabled ? undefined : 0}
         role={isDisabled ? undefined : "button"}
         aria-disabled={isDisabled}
-        className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/80 bg-white/65 shadow-[0_16px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-200 hover:shadow-[0_22px_44px_-16px_rgba(99,102,641,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${className}`}
+        className={`group relative cursor-pointer overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white/65 shadow-[0_16px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-200 hover:shadow-[0_22px_44px_-16px_rgba(99,102,641,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${className}`}
       >
         <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-sky-500 to-cyan-400" />
-        <div className="space-y-4 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="clamp-2 text-lg font-semibold leading-6 text-slate-800">{opportunity.announcementHeading}</h3>
-            <div className="flex items-center gap-2">
-              <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+        <div className="space-y-3 sm:space-y-4 p-3.5 sm:p-5">
+          <div className="flex flex-col xs:flex-row items-start gap-2 xs:gap-3 xs:justify-between">
+            <h3 className="clamp-2 text-base sm:text-lg font-semibold leading-6 text-slate-800">{opportunity.announcementHeading}</h3>
+            <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 flex-shrink-0">
+              <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2 xs:px-2.5 py-0.5 xs:py-1 text-xs font-medium text-indigo-700 whitespace-nowrap">
                 {opportunity.type}
               </span>
               <span
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                className={`rounded-full border px-2 xs:px-2.5 py-0.5 xs:py-1 text-xs font-medium whitespace-nowrap ${
                   archived
                     ? "border-rose-200 bg-rose-50 text-rose-700"
                     : effectiveApplied
@@ -231,33 +231,33 @@ whileHover={isDisabled ? {} : { y: -8 }}
             </div>
           </div>
 
-          <p className="clamp-2 text-sm leading-6 text-slate-600">{opportunity.description}</p>
+          <p className="clamp-2 text-xs sm:text-sm leading-5 sm:leading-6 text-slate-600">{opportunity.description}</p>
 
-          <div className="space-y-2 text-sm text-slate-600">
+          <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-slate-600">
             <p className="flex items-start gap-2">
-              <GraduationCap size={16} className="mt-0.5 shrink-0 text-indigo-600" aria-hidden="true" />
-              <span>
-                <span className="font-semibold text-slate-700">Eligibility:</span> {toLabel(opportunity.eligibilityCriteria)}
+              <GraduationCap size={14} className="mt-0.5 shrink-0 text-indigo-600 sm:size-4" aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="font-semibold text-slate-700">Eligibility:</span> <span className="break-words">{toLabel(opportunity.eligibilityCriteria)}</span>
               </span>
             </p>
             <p className="flex items-start gap-2">
-              <CalendarClock size={16} className="mt-0.5 shrink-0 text-sky-600" aria-hidden="true" />
-              <span>
+              <CalendarClock size={14} className="mt-0.5 shrink-0 text-sky-600 sm:size-4" aria-hidden="true" />
+              <span className="min-w-0">
                 <span className="font-semibold text-slate-700">Last Date:</span>{" "}
-                {new Date(opportunity.lastDate).toLocaleDateString()}
+                <span className="break-words">{new Date(opportunity.lastDate).toLocaleDateString()}</span>
               </span>
             </p>
             <p className="flex items-start gap-2">
-              <Building2 size={16} className="mt-0.5 shrink-0 text-cyan-600" aria-hidden="true" />
-              <span>
-                <span className="font-semibold text-slate-700">Departments:</span> {opportunity.department === OPPORTUNITY_BROADCAST_ALL ? "All Departments" : toLabel(opportunity.department)}
+              <Building2 size={14} className="mt-0.5 shrink-0 text-cyan-600 sm:size-4" aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="font-semibold text-slate-700">Departments:</span> <span className="break-words">{opportunity.department === OPPORTUNITY_BROADCAST_ALL ? "All Departments" : toLabel(opportunity.department)}</span>
               </span>
             </p>
             {opportunity.technicalSkills && opportunity.technicalSkills.length > 0 && (
               <p className="flex items-start gap-2">
-                <Code size={16} className="mt-0.5 shrink-0 text-purple-600" aria-hidden="true" />
-                <span>
-                  <span className="font-semibold text-slate-700">Skills:</span> {opportunity.technicalSkills.slice(0, 3).join(", ")}{opportunity.technicalSkills.length > 3 ? ` +${opportunity.technicalSkills.length - 3}` : ""}
+                <Code size={14} className="mt-0.5 shrink-0 text-purple-600 sm:size-4" aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="font-semibold text-slate-700">Skills:</span> <span className="break-words">{opportunity.technicalSkills.slice(0, 3).join(", ")}{opportunity.technicalSkills.length > 3 ? ` +${opportunity.technicalSkills.length - 3}` : ""}</span>
                 </span>
               </p>
             )}
@@ -265,18 +265,18 @@ whileHover={isDisabled ? {} : { y: -8 }}
 
           {/* Show applicant count for faculty/admin */}
           {!isStudent && applicantCount !== null && (
-            <div className="flex items-center gap-2 rounded-lg bg-indigo-50/60 px-3 py-2 border border-indigo-200/60">
-              <User size={14} className="text-indigo-600" />
-              <span className="text-sm font-medium text-indigo-700">{applicantCount} Applicant{applicantCount !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-2 rounded-lg bg-indigo-50/60 px-2.5 sm:px-3 py-1.5 sm:py-2 border border-indigo-200/60">
+              <User size={13} className="text-indigo-600 flex-shrink-0 sm:size-4" />
+              <span className="text-xs sm:text-sm font-medium text-indigo-700">{applicantCount} Applicant{applicantCount !== 1 ? 's' : ''}</span>
             </div>
           )}
 
-          <PrimaryButton className="w-full" onClick={() => setIsOpen(true)}>
+          <PrimaryButton className="w-full text-xs sm:text-sm" onClick={() => setIsOpen(true)}>
             View Details
           </PrimaryButton>
         </div>
         {canManage && canEditDelete ? (
-          <div className="pointer-events-none absolute right-3 top-3 flex gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="pointer-events-none absolute right-2 sm:right-3 top-2 sm:top-3 flex gap-1.5 xs:gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             <button
               type="button"
               disabled={editDisabled || editLoading || deleteLoading}
@@ -285,7 +285,7 @@ whileHover={isDisabled ? {} : { y: -8 }}
                 if (editDisabled || editLoading || deleteLoading) return;
                 onEdit?.(opportunity);
               }}
-              className={`pointer-events-auto rounded-lg border bg-white/85 p-2 transition ${
+              className={`pointer-events-auto rounded-lg border bg-white/85 p-1.5 xs:p-2 transition text-xs sm:text-sm ${
                 editDisabled || editLoading || deleteLoading
                   ? "cursor-not-allowed border-slate-200 text-slate-300"
                   : "border-slate-200 text-slate-600 hover:border-indigo-200 hover:text-indigo-600"
