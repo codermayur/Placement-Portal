@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { BookOpen, Code, Award, Briefcase, Link as LinkIcon, FileText, X, Plus, ChevronDown, ChevronUp, AlertCircle, CheckCircle, Loader } from "lucide-react";
 import api, { extractApiData, extractApiError } from "../api";
 import { PrimaryButton, StatusMessage } from "./ui";
 import SKILLS_BY_DEPARTMENT from "../constants/skillsByDepartment";
 
-const StudentProfileForm = ({ department, onFormChange }) => {
+const StudentProfileForm = forwardRef(({ department, onFormChange }, ref) => {
   const [activeTab, setActiveTab] = useState(1);
   const [loading, setLoading] = useState(false);
   const [savingSection, setSavingSection] = useState(null);
@@ -97,6 +97,67 @@ const StudentProfileForm = ({ department, onFormChange }) => {
     };
     loadProfile();
   }, []);
+
+  // Expose saveAll method to parent via ref
+  useImperativeHandle(ref, () => ({
+    async saveAll() {
+      try {
+        setLoading(true);
+        let allSaved = true;
+
+        // Try to save each section
+        const academicErrors = validateAcademicInfo();
+        if (Object.keys(academicErrors).length === 0) {
+          try {
+            await api.post("/student/academic-info", {
+              ...formData.academiInfo,
+              phone: formData.phone,
+            });
+          } catch (error) {
+            console.error("Error saving academic info:", error);
+            allSaved = false;
+          }
+        }
+
+        const skillsErrors = validateTechnicalSkills();
+        if (Object.keys(skillsErrors).length === 0) {
+          try {
+            await api.post("/student/technical-skills", {
+              skills: formData.technicalSkills,
+            });
+          } catch (error) {
+            console.error("Error saving skills:", error);
+            allSaved = false;
+          }
+        }
+
+        const linksErrors = validateProfessionalLinks();
+        if (Object.keys(linksErrors).length === 0) {
+          try {
+            await api.post("/student/professional-links", formData.professionalLinks);
+          } catch (error) {
+            console.error("Error saving professional links:", error);
+            allSaved = false;
+          }
+        }
+
+        if (allSaved) {
+          setSuccessMsg("All sections saved successfully!");
+          onFormChange && onFormChange();
+          return true;
+        } else {
+          setErrorMsg("Some sections failed to save. Please review and try again.");
+          return false;
+        }
+      } catch (error) {
+        setErrorMsg("Error saving profile. Please try again.");
+        console.error("Save all error:", error);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+  }));
 
   // Validation functions
   const validateAcademicInfo = () => {
@@ -626,8 +687,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
                 Select Technical Skills <span className="text-red-500">*</span>
               </label>
               <div className="grid gap-2 md:grid-cols-2">
-                {getAvailableSkills().map((skill) => (
-                  <label key={skill} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
+                {getAvailableSkills().map((skill, index) => (
+                  <label key={`available-skill-${index}-${skill}`} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50">
                     <input
                       type="checkbox"
                       checked={formData.technicalSkills.includes(skill)}
@@ -663,8 +724,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Selected Skills</label>
               <div className="flex flex-wrap gap-2">
-                {formData.technicalSkills.map((skill) => (
-                  <div key={skill} className="flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700">
+                {formData.technicalSkills.map((skill, index) => (
+                  <div key={`tech-skill-${index}-${skill}`} className="flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-sm text-indigo-700">
                     {skill}
                     <button
                       onClick={() => handleRemoveSkill(skill)}
@@ -813,8 +874,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {formData.newProject.technologies.map((tech) => (
-                      <div key={tech} className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-700">
+                    {formData.newProject.technologies.map((tech, index) => (
+                      <div key={`project-tech-${index}-${tech}`} className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-700">
                         {tech}
                         <button onClick={() => handleRemoveProjectTech(tech)} className="hover:text-emerald-900">
                           <X size={16} />
@@ -858,8 +919,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
                           <p className="mt-1 text-sm text-slate-600">{proj.description}</p>
                           {proj.technologies.length > 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
-                              {proj.technologies.map((tech) => (
-                                <span key={tech} className="inline-block rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                              {proj.technologies.map((tech, index) => (
+                                <span key={`tech-${proj._id}-${index}-${tech}`} className="inline-block rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
                                   {tech}
                                 </span>
                               ))}
@@ -995,6 +1056,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
       </div>
     </div>
   );
-};
+});
+
+StudentProfileForm.displayName = "StudentProfileForm";
 
 export default StudentProfileForm;

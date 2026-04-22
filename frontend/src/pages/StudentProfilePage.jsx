@@ -249,9 +249,33 @@ const StudentProfilePage = () => {
   }, []);
 
   const handleSaveAll = async () => {
-    // This would trigger save on all sections in the form
-    // The actual implementation would be passed through context or ref
-    console.log("Saving all sections...");
+    if (formRef.current?.saveAll) {
+      const success = await formRef.current.saveAll();
+      if (success) {
+        // Reload profile data after successful save
+        try {
+          const response = await api.get("/student/profile");
+          const data = extractApiData(response);
+          setProfile(data?.profile);
+          setHasUnsavedChanges(false);
+        } catch (err) {
+          console.error("Error reloading profile:", err);
+        }
+      }
+    }
+  };
+
+  // Handle form changes and refresh profile
+  const handleFormChange = async () => {
+    setHasUnsavedChanges(true);
+    // Reload profile data to update progress indicator
+    try {
+      const response = await api.get("/student/profile");
+      const data = extractApiData(response);
+      setProfile(data?.profile);
+    } catch (err) {
+      console.error("Error reloading profile:", err);
+    }
   };
 
   const handleNavigation = (destination) => {
@@ -305,7 +329,7 @@ const StudentProfilePage = () => {
           {/* Form */}
           {profile && (
             <div ref={formRef}>
-              <StudentProfileForm department={profile?.department} onFormChange={() => setHasUnsavedChanges(true)} />
+              <StudentProfileForm ref={formRef} department={profile?.department} onFormChange={handleFormChange} />
             </div>
           )}
 
