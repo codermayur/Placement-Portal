@@ -2,21 +2,42 @@ const Opportunity = require("../models/Opportunity");
 const OpportunityAttendance = require("../models/OpportunityAttendance");
 const { sanitizeString } = require("../utils/sanitize");
 const { ok, fail } = require("../utils/apiResponse");
-const { OPPORTUNITY_BROADCAST_ALL, isValidOpportunityDepartment } = require("../constants/departments");
+const { getTodayStart, normalizeDateToStartOfDay, getStatusFromLastDate } = require("../utils/dateUtils");
+const { OPPORTUNITY_BROADCAST_ALL, isValidOpportunityDepartment, DEPARTMENTS } = require("../constants/departments");
 
-const deriveStatusFromLastDate = (lastDate) =>
-  new Date(lastDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
-    ? "archived"
-    : "active";
+// Status logic: ACTIVE until end of lastDate, then ARCHIVED
+// If lastDate is earlier than today's date, it's archived
+const deriveStatusFromLastDate = (lastDate) => {
+  console.log(`[OPPORTUNITY] deriveStatusFromLastDate called with:`, lastDate);
+  const status = getStatusFromLastDate(lastDate);
+  console.log(`[OPPORTUNITY] deriveStatusFromLastDate result: ${status}`);
+  return status;
+};
 
-/*const deriveStatusFromLastDate = (lastDate) => (new Date(lastDate) < new Date() ? "archived" : "active");*/
-
+// Sync DB statuses: Compare lastDate (stored as start of day) with today's start
+// Archive if lastDate < today, Active if lastDate >= today
 const syncOpportunityStatuses = async () => {
-  const now = new Date();
-  await Promise.all([
-    Opportunity.updateMany({ lastDate: { $lt: now }, status: { $ne: "archived" } }, { $set: { status: "archived" } }),
-    Opportunity.updateMany({ lastDate: { $gte: now }, status: { $ne: "active" } }, { $set: { status: "active" } }),
-  ]);
+  console.log(`[OPPORTUNITY SYNC] Starting status sync...`);
+  const todayStart = getTodayStart();
+  const todayDate = todayStart.toISOString().split("T")[0];
+
+  console.log(`[OPPORTUNITY SYNC] Today's date: ${todayDate}`);
+
+  try {
+    const archivedResult = await Opportunity.updateMany(
+      { lastDate: { $lt: todayStart }, status: { $ne: "archived" } },
+      { $set: { status: "archived" } }
+    );
+    console.log(`[OPPORTUNITY SYNC] Archived ${archivedResult.modifiedCount} opportunities (lastDate < ${todayDate})`);
+
+    const activatedResult = await Opportunity.updateMany(
+      { lastDate: { $gte: todayStart }, status: { $ne: "active" } },
+      { $set: { status: "active" } }
+    );
+    console.log(`[OPPORTUNITY SYNC] Activated ${activatedResult.modifiedCount} opportunities (lastDate >= ${todayDate})`);
+  } catch (error) {
+    console.error(`[OPPORTUNITY SYNC ERROR]`, error.message);
+  }
 };
 
 const validatePayload = (payload) => {
@@ -75,7 +96,14 @@ const getDepartmentAudience = (department) => [department, OPPORTUNITY_BROADCAST
 
 const listOpportunities = async (req, res) => {
   try {
+    console.log(`[OPPORTUNITY LIST][START]`, {
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      userDepartment: req.user.department
+    });
+
     await syncOpportunityStatuses();
+
     const filter = {};
     if (req.user.role === "student" || req.user.role === "faculty") {
       filter.$or = [
@@ -95,8 +123,28 @@ const listOpportunities = async (req, res) => {
     ];
 
     const items = await Opportunity.aggregate(pipeline);
+
+    console.log(`[OPPORTUNITY LIST][RESULTS]`, {
+      totalCount: items.length,
+      active: items.filter(o => o.status === "active").length,
+      archived: items.filter(o => o.status === "archived").length,
+      userRole: req.user.role
+    });
+
+    // Log first few opportunities for debugging
+    items.slice(0, 3).forEach(op => {
+      console.log(`[OPPORTUNITY LIST][ITEM]`, {
+        id: op._id,
+        heading: op.announcementHeading?.substring(0, 30),
+        lastDate: op.lastDate?.toISOString().split("T")[0],
+        status: op.status,
+        department: op.department
+      });
+    });
+
     return ok(res, items.map(normalizeOpportunity));
   } catch (error) {
+    console.error(`[OPPORTUNITY LIST][ERROR]`, error.message);
     return fail(res, 500, "Failed to fetch opportunities", error.message);
   }
 };
@@ -136,6 +184,21 @@ const getOpportunityById = async (req, res) => {
 
 const createOpportunity = async (req, res) => {
   try {
+    console.log(`[OPPORTUNITIES][CREATE_START]`, {
+      userEmail: req.user.email,
+      userRole: req.user.role,
+      receivedLastDate: req.body.lastDate
+    });
+
+    const normalizedLastDate = normalizeDateToStartOfDay(req.body.lastDate);
+    const status = deriveStatusFromLastDate(normalizedLastDate);
+
+    console.log(`[OPPORTUNITIES][DATE_PROCESSING]`, {
+      receivedLastDate: req.body.lastDate,
+      normalizedLastDate: normalizedLastDate?.toISOString().split("T")[0],
+      derivedStatus: status
+    });
+
     const payload = {
       ...req.body,
       announcementHeading: sanitizeString(req.body.announcementHeading),
@@ -148,29 +211,75 @@ const createOpportunity = async (req, res) => {
         : sanitizeString(req.body.eligibilityCriteria),
       createdBy: req.user._id,
       createdName: req.user.name || req.user.email || "Unknown",
+      lastDate: normalizedLastDate,
     };
+
+    // Faculty can only create opportunities for their own department
     if (req.user.role === "faculty") {
-      payload.department = req.user.department;
+      if (!req.user.department || req.user.department.trim() === "") {
+        console.error('[OPPORTUNITIES][FACULTY_NO_DEPT]', { userId: req.user._id, email: req.user.email });
+        return fail(res, 400, "Your profile doesn't have a department assigned. Please contact admin.");
+      }
+      const facultyDept = req.user.department.trim();
+      payload.department = facultyDept;
+      console.log('[OPPORTUNITIES][FACULTY_DEPT_SET]', {
+        userId: req.user._id,
+        email: req.user.email,
+        department: facultyDept,
+        departmentLength: facultyDept.length,
+        departmentCharCodes: facultyDept.split('').map(c => c.charCodeAt(0))
+      });
     }
+
+    console.log('[OPPORTUNITIES][PRE_VALIDATION]', {
+      department: payload.department,
+      departmentLength: payload.department ? payload.department.length : 0,
+      isValidDept: isValidOpportunityDepartment(payload.department),
+      userRole: req.user.role
+    });
+
     if (!isValidOpportunityDepartment(payload.department)) {
-      return fail(res, 400, "Invalid department");
+      const depts = payload.department.split(",").map(d => d.trim()).filter(Boolean);
+      console.error('[OPPORTUNITIES][INVALID_DEPT]', {
+        department: payload.department,
+        parsedDepts: depts,
+        isAdmin: req.user.role === "admin",
+        isFaculty: req.user.role === "faculty",
+        validDepartments: DEPARTMENTS
+      });
+      return fail(res, 400, "Invalid department value");
     }
+
     payload.status = deriveStatusFromLastDate(payload.lastDate);
     const validationError = validatePayload(payload);
     if (validationError) {
-      console.error('[OPPORTUNITIES][VALIDATION_ERROR]', { payloadKeys: Object.keys(payload), error: validationError });
+      console.error('[OPPORTUNITIES][VALIDATION_ERROR]', { payloadKeys: Object.keys(payload), error: validationError, department: payload.department });
       return fail(res, 400, validationError);
     }
+
     const opportunity = await Opportunity.create(payload);
+    console.log('[OPPORTUNITIES][CREATED]', {
+      id: opportunity._id,
+      createdBy: req.user._id,
+      department: payload.department,
+      lastDate: opportunity.lastDate?.toISOString().split("T")[0],
+      status: opportunity.status
+    });
     return ok(res, normalizeOpportunity(opportunity), 201);
   } catch (error) {
-    console.error("[OPPORTUNITIES][CREATE]", { body: req.body, error: error.message });
+    console.error("[OPPORTUNITIES][CREATE]", { body: req.body, userId: req.user._id, error: error.message });
     return fail(res, 400, "Failed to create opportunity", error.message);
   }
 };
 
 const updateOpportunity = async (req, res) => {
   try {
+    console.log(`[OPPORTUNITIES][UPDATE_START]`, {
+      opportunityId: req.params.id,
+      userEmail: req.user.email,
+      receivedLastDate: req.body.lastDate
+    });
+
     const existing = await Opportunity.findById(req.params.id);
     if (!existing) return fail(res, 404, "Opportunity not found");
 
@@ -180,6 +289,17 @@ const updateOpportunity = async (req, res) => {
     if (isArchivedOpportunity(existing)) {
       return fail(res, 409, "Cannot edit archived opportunities");
     }
+
+    const normalizedLastDate = normalizeDateToStartOfDay(req.body.lastDate);
+    const status = deriveStatusFromLastDate(normalizedLastDate);
+
+    console.log(`[OPPORTUNITIES][UPDATE_DATE_PROCESSING]`, {
+      opportunityId: req.params.id,
+      previousLastDate: existing.lastDate?.toISOString().split("T")[0],
+      newLastDate: req.body.lastDate,
+      normalizedLastDate: normalizedLastDate?.toISOString().split("T")[0],
+      newStatus: status
+    });
 
     const payload = {
       ...req.body,
@@ -191,20 +311,42 @@ const updateOpportunity = async (req, res) => {
       eligibilityCriteria: Array.isArray(req.body.eligibilityCriteria)
         ? req.body.eligibilityCriteria.map(sanitizeString).filter(Boolean).join(", ")
         : sanitizeString(req.body.eligibilityCriteria),
+      lastDate: normalizedLastDate,
     };
-    if (req.user.role === "faculty") payload.department = req.user.department;
-    if (!isValidOpportunityDepartment(payload.department)) {
-      return fail(res, 400, "Invalid department");
+
+    // Faculty can only create opportunities for their own department
+    if (req.user.role === "faculty") {
+      if (!req.user.department || req.user.department.trim() === "") {
+        console.error('[OPPORTUNITIES][FACULTY_NO_DEPT]', { userId: req.user._id, email: req.user.email, opportunityId: req.params.id });
+        return fail(res, 400, "Your profile doesn't have a department assigned. Please contact admin.");
+      }
+      payload.department = req.user.department.trim();
+      console.log('[OPPORTUNITIES][FACULTY_DEPT_SET_UPDATE]', { userId: req.user._id, opportunityId: req.params.id, department: payload.department });
     }
+
+    if (!isValidOpportunityDepartment(payload.department)) {
+      console.error('[OPPORTUNITIES][INVALID_DEPT_UPDATE]', { department: payload.department, opportunityId: req.params.id });
+      return fail(res, 400, "Invalid department value");
+    }
+
     payload.status = deriveStatusFromLastDate(payload.lastDate);
     const validationError = validatePayload(payload);
-    if (validationError) return fail(res, 400, validationError);
+    if (validationError) {
+      console.error('[OPPORTUNITIES][VALIDATION_ERROR_UPDATE]', { error: validationError, department: payload.department, opportunityId: req.params.id });
+      return fail(res, 400, validationError);
+    }
 
     const updated = await Opportunity.findByIdAndUpdate(req.params.id, payload, { new: true });
+    console.log('[OPPORTUNITIES][UPDATED]', {
+      id: req.params.id,
+      updatedBy: req.user._id,
+      department: payload.department,
+      lastDate: updated.lastDate?.toISOString().split("T")[0],
+      newStatus: updated.status
+    });
     return ok(res, normalizeOpportunity(updated));
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error("[OPPORTUNITIES][UPDATE]", { id: req.params.id, body: req.body, error: error.message });
+    console.error("[OPPORTUNITIES][UPDATE]", { id: req.params.id, userId: req.user._id, error: error.message });
     return fail(res, 400, "Failed to update opportunity", error.message);
   }
 };
@@ -225,21 +367,26 @@ const deleteOpportunity = async (req, res) => {
 
 const getActiveOpportunities = async (req, res) => {
   try {
+    console.log(`[OPPORTUNITY ACTIVE][START]`, {
+      userEmail: req.user.email,
+      userRole: req.user.role
+    });
+
     await syncOpportunityStatuses();
     const filter = { status: "active" };
 
     if (req.user.role === "faculty") {
       // Faculty can only see opportunities they created
       filter.createdBy = req.user._id;
-      console.log(`[OPPORTUNITY] Fetching active opportunities for faculty: ${req.user.email}`);
+      console.log(`[OPPORTUNITY ACTIVE] Fetching active opportunities for faculty: ${req.user.email}`);
     } else if (req.user.role === "student") {
       filter.$or = [
         { department: OPPORTUNITY_BROADCAST_ALL },
         { department: { $regex: new RegExp(`\\b${req.user.department}\\b`) } }
       ];
-      console.log(`[OPPORTUNITY] Fetching active opportunities for student ${req.user.email} (dept: ${req.user.department})`);
+      console.log(`[OPPORTUNITY ACTIVE] Fetching active opportunities for student ${req.user.email} (dept: ${req.user.department})`);
     } else {
-      console.log(`[OPPORTUNITY] Fetching active opportunities for ${req.user.role}: ${req.user.email}`);
+      console.log(`[OPPORTUNITY ACTIVE] Fetching active opportunities for ${req.user.role}: ${req.user.email}`);
     }
 
     const pipeline = [
@@ -253,33 +400,55 @@ const getActiveOpportunities = async (req, res) => {
     ];
 
     const data = await Opportunity.aggregate(pipeline);
-    console.log(`[OPPORTUNITY ✓] Found ${data.length} active opportunities for ${req.user.role}`);
+    console.log(`[OPPORTUNITY ACTIVE][RESULTS]`, {
+      found: data.length,
+      userRole: req.user.role
+    });
+
+    // Log first few for debugging
+    data.slice(0, 3).forEach(op => {
+      const today = getTodayStart().toISOString().split("T")[0];
+      console.log(`[OPPORTUNITY ACTIVE][ITEM]`, {
+        id: op._id,
+        heading: op.announcementHeading?.substring(0, 25),
+        lastDate: op.lastDate?.toISOString().split("T")[0],
+        today: today,
+        status: op.status,
+        createdName: op.createdName
+      });
+    });
+
     // Pass user email for students to check hasApplied status
     const userEmail = req.user.role === "student" ? req.user.email : null;
     return ok(res, data.map(doc => normalizeOpportunity(doc, userEmail)));
   } catch (error) {
-    console.error(`[OPPORTUNITY ERROR] getActiveOpportunities failed: ${error.message}`);
+    console.error(`[OPPORTUNITY ACTIVE][ERROR] getActiveOpportunities failed: ${error.message}`);
     return fail(res, 500, "Failed to fetch active opportunities", error.message);
   }
 };
 
 const getArchivedOpportunities = async (req, res) => {
   try {
+    console.log(`[OPPORTUNITY ARCHIVED][START]`, {
+      userEmail: req.user.email,
+      userRole: req.user.role
+    });
+
     await syncOpportunityStatuses();
     const filter = { status: "archived" };
 
     if (req.user.role === "faculty") {
       // Faculty can only see opportunities they created
       filter.createdBy = req.user._id;
-      console.log(`[OPPORTUNITY] Fetching archived opportunities for faculty: ${req.user.email}`);
+      console.log(`[OPPORTUNITY ARCHIVED] Fetching archived opportunities for faculty: ${req.user.email}`);
     } else if (req.user.role === "student") {
       filter.$or = [
         { department: OPPORTUNITY_BROADCAST_ALL },
         { department: { $regex: new RegExp(`\\b${req.user.department}\\b`) } }
       ];
-      console.log(`[OPPORTUNITY] Fetching archived opportunities for student ${req.user.email} (dept: ${req.user.department})`);
+      console.log(`[OPPORTUNITY ARCHIVED] Fetching archived opportunities for student ${req.user.email} (dept: ${req.user.department})`);
     } else {
-      console.log(`[OPPORTUNITY] Fetching archived opportunities for ${req.user.role}: ${req.user.email}`);
+      console.log(`[OPPORTUNITY ARCHIVED] Fetching archived opportunities for ${req.user.role}: ${req.user.email}`);
     }
 
     const pipeline = [
@@ -293,12 +462,26 @@ const getArchivedOpportunities = async (req, res) => {
     ];
 
     const data = await Opportunity.aggregate(pipeline);
-    console.log(`[OPPORTUNITY ✓] Found ${data.length} archived opportunities for ${req.user.role}`);
+    console.log(`[OPPORTUNITY ARCHIVED][RESULTS]`, {
+      found: data.length,
+      userRole: req.user.role
+    });
+
+    // Log first few for debugging
+    data.slice(0, 3).forEach(op => {
+      console.log(`[OPPORTUNITY ARCHIVED][ITEM]`, {
+        id: op._id,
+        heading: op.announcementHeading?.substring(0, 25),
+        lastDate: op.lastDate?.toISOString().split("T")[0],
+        status: op.status
+      });
+    });
+
     // Pass user email for students to check hasApplied status
     const userEmail = req.user.role === "student" ? req.user.email : null;
     return ok(res, data.map(doc => normalizeOpportunity(doc, userEmail)));
   } catch (error) {
-    console.error(`[OPPORTUNITY ERROR] getArchivedOpportunities failed: ${error.message}`);
+    console.error(`[OPPORTUNITY ARCHIVED][ERROR] getArchivedOpportunities failed: ${error.message}`);
     return fail(res, 500, "Failed to fetch archived opportunities", error.message);
   }
 };

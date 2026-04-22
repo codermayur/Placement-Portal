@@ -6,7 +6,7 @@ const Navbar = () => (
       <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 lg:gap-4 min-w-0 flex-1">
         <Logo />
         <span className="text-xs xs:text-sm sm:text-base font-semibold tracking-tight text-slate-900 truncate">
-          Placement Portal
+          Vidyalankar Placement Portal
         </span>
       </div>
       <div className="text-xs xs:text-xs sm:text-sm text-slate-500 whitespace-nowrap flex-shrink-0">

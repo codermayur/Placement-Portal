@@ -1,6 +1,6 @@
 import React from "react";
 
-const Badge = ({ link = "https://www.linkedin.com/in/your-profile/" }) => {
+const Badge = ({ link = "https://www.linkedin.com/in/mayuresh-tandel-1104dev/" }) => {
   return (
     <>
       <style>{`
@@ -28,7 +28,7 @@ const Badge = ({ link = "https://www.linkedin.com/in/your-profile/" }) => {
         }
 
         .badge-container::before {
-          content: "";
+          content: "none";
           position: absolute;
           top: 0;
           left: -1000px;

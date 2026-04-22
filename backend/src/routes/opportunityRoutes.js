@@ -20,8 +20,8 @@ const router = express.Router();
 
 router.get("/active", protect, getActiveOpportunities);
 router.get("/archive", protect, getArchivedOpportunities);
-router.get("/", listOpportunities);
-router.get("/:id", getOpportunityById);
+router.get("/", protect, listOpportunities);
+router.get("/:id", protect, getOpportunityById);
 router.post("/", protect, allowRoles("admin", "faculty"), validateOpportunityRequest, createOpportunity);
 router.put("/:id", protect, allowRoles("admin", "faculty"), validateOpportunityRequest, updateOpportunity);
 router.post("/:id/apply", protect, applyToOpportunity);

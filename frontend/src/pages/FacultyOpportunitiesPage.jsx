@@ -72,6 +72,16 @@ const FacultyOpportunitiesPage = () => {
   const [message, setMessage] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Sync form department when user department loads
+  useEffect(() => {
+    if (user?.department && !editingId) {
+      setForm((prevForm) => ({
+        ...prevForm,
+        department: user.department,
+      }));
+    }
+  }, [user?.department, editingId]);
+
   const loadOpportunities = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -142,19 +152,30 @@ const FacultyOpportunitiesPage = () => {
     if (selectedDate < today) {
       return "Last date cannot be in the past";
     }
+    if (!form.department || form.department.trim() === "") {
+      return "Department is required. Please ensure your profile has a department assigned.";
+    }
     return "";
   };
 
-  const buildPayload = () => ({
-    ...form,
-    announcementHeading: form.announcementHeading.trim(),
-    description: form.description.trim(),
-    department: form.department,
-    applicationLink: form.applicationLink || "",
-    eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
-      ? form.eligibilityCriteria.filter(Boolean).join(", ")
-      : (form.eligibilityCriteria || "").trim(),
-  });
+  const buildPayload = () => {
+    const payload = {
+      ...form,
+      announcementHeading: form.announcementHeading.trim(),
+      description: form.description.trim(),
+      department: form.department.trim(),
+      applicationLink: form.applicationLink || "",
+      eligibilityCriteria: Array.isArray(form.eligibilityCriteria)
+        ? form.eligibilityCriteria.filter(Boolean).join(", ")
+        : (form.eligibilityCriteria || "").trim(),
+    };
+    console.log('[FACULTY_FORM] Building payload with department:', {
+      department: payload.department,
+      departmentLength: payload.department?.length,
+      userDepartment: user?.department
+    });
+    return payload;
+  };
 
   const handleSubmit = async () => {
     const validationError = validateForm();
@@ -167,6 +188,12 @@ const FacultyOpportunitiesPage = () => {
     setError("");
     setMessage("");
     const payload = buildPayload();
+
+    console.log('[FACULTY_FORM] Submitting with payload:', {
+      department: payload.department,
+      heading: payload.announcementHeading,
+      lastDate: payload.lastDate
+    });
 
     try {
       if (editingId) {

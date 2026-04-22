@@ -1,7 +1,20 @@
 const mongoose = require("mongoose");
 const { isValidOpportunityDepartment } = require("../constants/departments");
+const { getStatusFromLastDate } = require("../utils/dateUtils");
 
-const getOpportunityStatus = (lastDate) => (new Date(lastDate) < new Date() ? "archived" : "active");
+// Status logic: Compare lastDate with today's start date
+// ACTIVE until end of lastDate, ARCHIVED after lastDate day ends
+const getOpportunityStatus = (lastDate) => {
+  if (!lastDate) {
+    console.log("[OPPORTUNITY MODEL] getOpportunityStatus: lastDate is null, returning 'active'");
+    return "active";
+  }
+
+  console.log("[OPPORTUNITY MODEL] getOpportunityStatus called with lastDate:", lastDate);
+  const status = getStatusFromLastDate(lastDate);
+  console.log("[OPPORTUNITY MODEL] getOpportunityStatus result:", status);
+  return status;
+};
 
 const opportunitySchema = new mongoose.Schema(
   {
