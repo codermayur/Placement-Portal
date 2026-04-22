@@ -7,34 +7,58 @@ const { OPPORTUNITY_BROADCAST_ALL, isValidOpportunityDepartment, DEPARTMENTS } =
 
 // Status logic: ACTIVE until end of lastDate, then ARCHIVED
 // If lastDate is earlier than today's date, it's archived
+// ⭐ THIS IS THE SINGLE SOURCE OF TRUTH FOR STATUS DERIVATION ⭐
 const deriveStatusFromLastDate = (lastDate) => {
-  console.log(`[OPPORTUNITY] deriveStatusFromLastDate called with:`, lastDate);
+  console.log(`[OPPORTUNITY] ⭐ deriveStatusFromLastDate - SINGLE SOURCE OF TRUTH`);
+  console.log(`[OPPORTUNITY] Input lastDate:`, lastDate);
   const status = getStatusFromLastDate(lastDate);
-  console.log(`[OPPORTUNITY] deriveStatusFromLastDate result: ${status}`);
+  console.log(`[OPPORTUNITY] ⭐ Derived status: ${status}`);
   return status;
 };
 
 // Sync DB statuses: Compare lastDate (stored as start of day) with today's start
 // Archive if lastDate < today, Active if lastDate >= today
+// Uses normalized start-of-day comparison to avoid timezone issues
 const syncOpportunityStatuses = async () => {
-  console.log(`[OPPORTUNITY SYNC] Starting status sync...`);
+  console.log(`\n[OPPORTUNITY SYNC] ========== STARTING STATUS SYNC ==========`);
   const todayStart = getTodayStart();
   const todayDate = todayStart.toISOString().split("T")[0];
 
-  console.log(`[OPPORTUNITY SYNC] Today's date: ${todayDate}`);
+  console.log(`[OPPORTUNITY SYNC] Today's normalized date: ${todayDate} (${todayStart.getTime()})`);
 
   try {
+    // Get all opportunities to check their status
+    const allOpportunities = await Opportunity.find({}, {
+      _id: 1,
+      announcementHeading: 1,
+      lastDate: 1,
+      status: 1
+    });
+
+    console.log(`[OPPORTUNITY SYNC] Total opportunities in database: ${allOpportunities.length}`);
+
+    // Check first few for logging
+    allOpportunities.slice(0, 5).forEach(op => {
+      const opLastDate = op.lastDate ? op.lastDate.toISOString().split("T")[0] : "null";
+      const derivedStatus = deriveStatusFromLastDate(op.lastDate);
+      const statusMatches = op.status === derivedStatus;
+      console.log(`[OPPORTUNITY SYNC] Sample - ID: ${op._id}, lastDate: ${opLastDate}, currentStatus: ${op.status}, derivedStatus: ${derivedStatus}, match: ${statusMatches}`);
+    });
+
+    // Archive opportunities where lastDate < today
     const archivedResult = await Opportunity.updateMany(
       { lastDate: { $lt: todayStart }, status: { $ne: "archived" } },
       { $set: { status: "archived" } }
     );
-    console.log(`[OPPORTUNITY SYNC] Archived ${archivedResult.modifiedCount} opportunities (lastDate < ${todayDate})`);
+    console.log(`[OPPORTUNITY SYNC] ✓ Archived ${archivedResult.modifiedCount} opportunities (lastDate < ${todayDate})`);
 
+    // Activate opportunities where lastDate >= today
     const activatedResult = await Opportunity.updateMany(
       { lastDate: { $gte: todayStart }, status: { $ne: "active" } },
       { $set: { status: "active" } }
     );
-    console.log(`[OPPORTUNITY SYNC] Activated ${activatedResult.modifiedCount} opportunities (lastDate >= ${todayDate})`);
+    console.log(`[OPPORTUNITY SYNC] ✓ Activated ${activatedResult.modifiedCount} opportunities (lastDate >= ${todayDate})`);
+    console.log(`[OPPORTUNITY SYNC] ========== STATUS SYNC COMPLETE ==========\n`);
   } catch (error) {
     console.error(`[OPPORTUNITY SYNC ERROR]`, error.message);
   }
@@ -251,6 +275,11 @@ const createOpportunity = async (req, res) => {
     }
 
     payload.status = deriveStatusFromLastDate(payload.lastDate);
+    console.log(`[OPPORTUNITIES][STATUS_SET_CREATE]`, {
+      lastDate: payload.lastDate?.toISOString().split("T")[0],
+      statusSet: payload.status,
+      source: "deriveStatusFromLastDate"
+    });
     const validationError = validatePayload(payload);
     if (validationError) {
       console.error('[OPPORTUNITIES][VALIDATION_ERROR]', { payloadKeys: Object.keys(payload), error: validationError, department: payload.department });
@@ -330,6 +359,13 @@ const updateOpportunity = async (req, res) => {
     }
 
     payload.status = deriveStatusFromLastDate(payload.lastDate);
+    console.log(`[OPPORTUNITIES][STATUS_SET_UPDATE]`, {
+      opportunityId: req.params.id,
+      previousStatus: existing.status,
+      lastDate: payload.lastDate?.toISOString().split("T")[0],
+      statusSet: payload.status,
+      source: "deriveStatusFromLastDate"
+    });
     const validationError = validatePayload(payload);
     if (validationError) {
       console.error('[OPPORTUNITIES][VALIDATION_ERROR_UPDATE]', { error: validationError, department: payload.department, opportunityId: req.params.id });

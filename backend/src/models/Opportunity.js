@@ -4,15 +4,17 @@ const { getStatusFromLastDate } = require("../utils/dateUtils");
 
 // Status logic: Compare lastDate with today's start date
 // ACTIVE until end of lastDate, ARCHIVED after lastDate day ends
+// ⭐ Uses getStatusFromLastDate as source of truth ⭐
 const getOpportunityStatus = (lastDate) => {
   if (!lastDate) {
     console.log("[OPPORTUNITY MODEL] getOpportunityStatus: lastDate is null, returning 'active'");
     return "active";
   }
 
-  console.log("[OPPORTUNITY MODEL] getOpportunityStatus called with lastDate:", lastDate);
+  console.log("[OPPORTUNITY MODEL] getOpportunityStatus - CALLING getStatusFromLastDate");
+  console.log("[OPPORTUNITY MODEL] Raw lastDate:", lastDate);
   const status = getStatusFromLastDate(lastDate);
-  console.log("[OPPORTUNITY MODEL] getOpportunityStatus result:", status);
+  console.log("[OPPORTUNITY MODEL] ⭐ Status derivation complete:", status);
   return status;
 };
 
@@ -55,7 +57,9 @@ opportunitySchema.pre("validate", function validateDepartment() {
   if (!isValidOpportunityDepartment(this.department)) {
     throw new Error("Invalid department value");
   }
+  console.log(`[OPPORTUNITY MODEL VALIDATE][PRE-HOOK] Setting status from lastDate`);
   this.status = getOpportunityStatus(this.lastDate);
+  console.log(`[OPPORTUNITY MODEL VALIDATE][PRE-HOOK] Status set to: ${this.status}`);
 });
 
 opportunitySchema.index({ lastDate: 1 });

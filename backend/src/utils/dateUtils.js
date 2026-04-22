@@ -6,14 +6,15 @@
 
 /**
  * Get current date at start of day (00:00:00) in local timezone
- * @returns {Date} Today at 00:00:00
+ * Used for database comparisons with normalized start-of-day dates
+ * @returns {Date} Today at 00:00:00 local time
  */
 const getTodayStart = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const logDate = today.toISOString().split("T")[0];
-  console.log(`[DATE_UTILS] getTodayStart: ${logDate} (${today.getTime()})`);
-  return today;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dateDisplay = todayStart.toISOString().split("T")[0];
+  console.log(`[DATE_UTILS] getTodayStart: ${dateDisplay} (timestamp: ${todayStart.getTime()})`);
+  return todayStart;
 };
 
 /**
@@ -96,21 +97,76 @@ const isDateInPast = (date) => {
  * @param {Date} lastDate - The opportunity's last date (should be normalized)
  * @returns {string} "archived" or "active"
  */
+// const getStatusFromLastDate = (lastDate) => {
+//   if (!lastDate) {
+//     console.log("[DATE_UTILS] getStatusFromLastDate: lastDate is null, returning 'active'");
+//     return "active";
+//   }
+
+//   const today = getTodayStart();
+//   const normLastDate = normalizeDateToStartOfDay(lastDate);
+//   const status = normLastDate < today ? "archived" : "active";
+
+//   console.log(`[DATE_UTILS] getStatusFromLastDate:`, {
+//     lastDate: normLastDate.toISOString().split("T")[0],
+//     today: today.toISOString().split("T")[0],
+//     comparison: normLastDate < today ? "lastDate < today" : "lastDate >= today",
+//     status: status
+//   });
+
+//   return status;
+// };
+
+/**
+ * Determine opportunity status based on lastDate (timezone-safe)
+ * Returns "active" if lastDate >= today, "archived" if lastDate < today
+ * Comparison is done at day level, ignoring time components
+ *
+ * @param {Date|string|null} lastDate - The opportunity's last date
+ * @returns {string} "active" or "archived"
+ */
 const getStatusFromLastDate = (lastDate) => {
   if (!lastDate) {
-    console.log("[DATE_UTILS] getStatusFromLastDate: lastDate is null, returning 'active'");
+    console.log(`[DATE_UTILS] getStatusFromLastDate: Input is null/undefined, returning 'active'`);
     return "active";
   }
 
-  const today = getTodayStart();
-  const normLastDate = normalizeDateToStartOfDay(lastDate);
-  const status = normLastDate < today ? "archived" : "active";
+  // Get today's start of day (local timezone)
+  const now = new Date();
+  const todayNormalized = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+  // Parse and normalize lastDate to start of day (local timezone)
+  let lastParsed;
+  let rawDateLog = "";
+
+  if (typeof lastDate === "string") {
+    // Parse string format like "2026-04-22" as local midnight
+    const [year, month, day] = lastDate.split("-");
+    lastParsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    rawDateLog = `string "${lastDate}"`;
+  } else if (lastDate instanceof Date) {
+    lastParsed = new Date(lastDate);
+    rawDateLog = `Date: ${lastDate.toISOString()}`;
+  } else {
+    console.warn(`[DATE_UTILS] getStatusFromLastDate: Unknown input type: ${typeof lastDate}`);
+    lastParsed = new Date(lastDate);
+    rawDateLog = `unknown type: ${lastDate}`;
+  }
+
+  // Normalize to start of day (local timezone)
+  const lastNormalized = new Date(lastParsed.getFullYear(), lastParsed.getMonth(), lastParsed.getDate());
+
+  const status = todayNormalized > lastNormalized ? "archived" : "active";
+
+  // Detailed logging for debugging
   console.log(`[DATE_UTILS] getStatusFromLastDate:`, {
-    lastDate: normLastDate.toISOString().split("T")[0],
-    today: today.toISOString().split("T")[0],
-    comparison: normLastDate < today ? "lastDate < today" : "lastDate >= today",
-    status: status
+    rawLastDate: rawDateLog,
+    todayNormalized: todayNormalized.toISOString().split("T")[0],
+    lastNormalized: lastNormalized.toISOString().split("T")[0],
+    todayTime: todayNormalized.getTime(),
+    lastTime: lastNormalized.getTime(),
+    comparison: todayNormalized > lastNormalized ? "today > lastDate (archived)" : "today <= lastDate (active)",
+    result: status
   });
 
   return status;
