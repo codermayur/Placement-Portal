@@ -81,22 +81,29 @@ router.post("/:opportunityId", protect, allowRoles("faculty", "admin"), async (r
       }
     }
 
-    // Populate postedBy with name and role
-    await timelineEntry.populate("postedBy", "name role");
+    // Refetch the entry with proper population for socket emit
+    const populatedEntry = await OpportunityTimeline.findById(timelineEntry._id)
+      .populate("postedBy", "name role")
+      .lean();
 
     // Get updated activeStages
     const updatedOpportunity = await Opportunity.findById(opportunityId);
 
-    // Emit Socket.IO event
+    // Emit Socket.IO event with properly populated entry
     const io = getIO();
     if (io) {
+      console.log('[TIMELINE SOCKET] Emitting entry:', {
+        _id: populatedEntry._id,
+        postedBy: populatedEntry.postedBy,
+        stage: populatedEntry.stage
+      });
       io.to(`opportunity_${opportunityId}`).emit("timeline:new_entry", {
-        entry: timelineEntry.toObject(),
+        entry: populatedEntry,
         activeStages: updatedOpportunity.activeStages,
       });
     }
 
-    return res.status(201).json({ data: timelineEntry, message: "Timeline entry created" });
+    return res.status(201).json({ data: populatedEntry, message: "Timeline entry created" });
   } catch (error) {
     console.error("[TIMELINE POST ERROR]", {
       opportunityId: req.params.opportunityId,

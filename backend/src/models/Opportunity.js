@@ -15,6 +15,7 @@ const opportunitySchema = new mongoose.Schema(
     technicalSkills: [{ type: String, trim: true }],
     applicationLink: { type: String, default: "", trim: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    createdName: { type: String, required: true, trim: true },
     applications: [{
       studentId: { type: String, trim: true },
       studentEmail: { type: String, required: true, trim: true },

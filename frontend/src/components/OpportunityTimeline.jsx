@@ -23,7 +23,7 @@ const stageOrder = [
 ];
 
   const OpportunityTimeline = ({ opportunityId, userRole, activeStages }) => {
-  const { fetchTimeline } = useOpportunities();
+  const { fetchTimeline, invalidateTimelineCache } = useOpportunities();
   const [timelineEntries, setTimelineEntries] = useState([]);
   const [localActiveStages, setLocalActiveStages] = useState(activeStages || []);
   const [newComment, setNewComment] = useState("");
@@ -61,9 +61,12 @@ const stageOrder = [
     const doFetch = async () => {
       try {
         setIsLoading(true);
-        const data = await fetchTimeline(opportunityId);
-        console.log('Timeline data received:', data, 'Type:', typeof data, 'IsArray:', Array.isArray(data));
-        setTimelineEntries(Array.isArray(data) ? data : []);
+        const result = await fetchTimeline(opportunityId);
+        console.log('Timeline data received:', result);
+        const timeline = Array.isArray(result?.timeline) ? result.timeline : [];
+        const stages = Array.isArray(result?.activeStages) ? result.activeStages : [];
+        setTimelineEntries(timeline);
+        setLocalActiveStages(stages);
         lastFetchRef.current = now;
       } catch (err) {
         setError(err.response?.data?.message || "Failed to fetch timeline");
@@ -79,11 +82,17 @@ const stageOrder = [
   // Socket listener for new timeline entries
   useEffect(() => {
     const handleTimelineEntry = ({ entry, activeStages: newActiveStages }) => {
+      console.log('[Timeline Socket] New entry received:', entry, 'activeStages:', newActiveStages);
       setTimelineEntries((prev) => {
         const updated = [...(Array.isArray(prev) ? prev : []), entry];
         return updated;
       });
-      setLocalActiveStages(newActiveStages);
+      // Update local stages
+      if (Array.isArray(newActiveStages) && newActiveStages.length > 0) {
+        setLocalActiveStages(newActiveStages);
+        // Update cache for the context so other components get fresh data
+        invalidateTimelineCache(opportunityId);
+      }
     };
 
     socket.on("timeline:new_entry", handleTimelineEntry);
@@ -91,7 +100,7 @@ const stageOrder = [
     return () => {
       socket.off("timeline:new_entry", handleTimelineEntry);
     };
-  }, []);
+  }, [socket, opportunityId, invalidateTimelineCache]);
 
   const handlePostUpdate = async () => {
     if (!newComment.trim() || !selectedStage) {

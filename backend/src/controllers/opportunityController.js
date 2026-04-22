@@ -1,4 +1,5 @@
 const Opportunity = require("../models/Opportunity");
+const OpportunityAttendance = require("../models/OpportunityAttendance");
 const { sanitizeString } = require("../utils/sanitize");
 const { ok, fail } = require("../utils/apiResponse");
 const { OPPORTUNITY_BROADCAST_ALL, isValidOpportunityDepartment } = require("../constants/departments");
@@ -141,6 +142,7 @@ const createOpportunity = async (req, res) => {
         ? req.body.eligibilityCriteria.map(sanitizeString).filter(Boolean).join(", ")
         : sanitizeString(req.body.eligibilityCriteria),
       createdBy: req.user._id,
+      createdName: req.user.name || req.user.email || "Unknown",
     };
     if (req.user.role === "faculty") {
       payload.department = req.user.department;
@@ -336,6 +338,29 @@ const applyToOpportunity = async (req, res) => {
     opportunity.applications.push(applicationData);
 
     const updatedOpportunity = await opportunity.save();
+
+    // Create attendance records for all active stages
+    if (opportunity.activeStages && opportunity.activeStages.length > 0) {
+      const attendanceRecords = opportunity.activeStages.map((stage) => ({
+        opportunityId: opportunity._id,
+        studentId: req.user.studentId,
+        stage,
+        status: "pending",
+        markedBy: null,
+        markedAt: null,
+      }));
+
+      try {
+        await OpportunityAttendance.insertMany(attendanceRecords, { ordered: false });
+        console.log(`[APPLY] Created ${attendanceRecords.length} attendance records for student ${req.user.studentId}`);
+      } catch (error) {
+        // Duplicate errors (E11000) are expected if records already exist
+        if (!error.message.includes("duplicate") && !error.message.includes("E11000")) {
+          console.error("[APPLY ATTENDANCE ERROR]", { studentId: req.user.studentId, error: error.message });
+        }
+      }
+    }
+
     return ok(res, normalizeOpportunity(updatedOpportunity));
   } catch (error) {
     console.error('[APPLY_ERROR]', { message: error.message, stack: error.stack });

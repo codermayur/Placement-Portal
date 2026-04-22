@@ -53,13 +53,13 @@ const OpportunityCard = ({
 }) => {
   const { user } = useAuth();
   const socket = getSocket();
+  const { fetchTimeline, invalidateTimelineCache } = useOpportunities();
   const [isOpen, setIsOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [localApplied, setLocalApplied] = useState(hasApplied);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("details");
   const [activeStages, setActiveStages] = useState([]);
-  const { fetchTimeline } = useOpportunities();
   const [applicants, setApplicants] = useState([]);
   const [applicantsLoading, setApplicantsLoading] = useState(false);
   const [applicantsError, setApplicantsError] = useState("");
@@ -71,40 +71,29 @@ const OpportunityCard = ({
     // Join opportunity room on modal open
     socket.emit("join:opportunity", { opportunityId: opportunity._id });
 
-    // Fetch timeline to get initial activeStages
-    const fetchInitialActiveStages = async () => {
-      try {
-        const timeline = await fetchTimeline(opportunity._id);
-        // fetchTimeline returns the timelineData array from context, which was populated from the response that had activeStages
-        // We need to re-fetch to get activeStages from the backend response directly
-        const response = await fetch(`/api/timeline/${opportunity._id}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.data?.activeStages) {
-            setActiveStages(result.data.activeStages);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch initial activeStages:', err);
-      }
-    };
-
-    fetchInitialActiveStages();
-
     // Cleanup on modal close
     return () => {
       socket.emit("leave:opportunity", { opportunityId: opportunity._id });
     };
-  }, [isOpen, opportunity?._id, socket, fetchTimeline]);
+  }, [isOpen, opportunity?._id, socket]);
 
-  // Listen for activeStages updates via socket
+  // Listen for activeStages updates via socket and refetch timeline
   useEffect(() => {
     const handleTimelineEntry = ({ activeStages: newActiveStages }) => {
-      setActiveStages(newActiveStages);
+      console.log('[OpportunityCard Socket] timeline:new_entry received with activeStages:', newActiveStages);
+      if (opportunity?._id) {
+
+        // Invalidate cache so next fetch gets fresh data
+        invalidateTimelineCache(opportunity._id);
+        // Then immediately refetch to get updated activeStages
+        fetchTimeline(opportunity._id).then((result) => {
+          const activeStagesFromFetch = Array.isArray(result?.activeStages) ? result.activeStages : [];
+          console.log('[OpportunityCard Socket] Updated activeStages from refetch:', activeStagesFromFetch);
+          if (activeStagesFromFetch.length > 0) {
+            setActiveStages(activeStagesFromFetch);
+          }
+        });
+      }
     };
 
     socket.on("timeline:new_entry", handleTimelineEntry);
@@ -112,7 +101,27 @@ const OpportunityCard = ({
     return () => {
       socket.off("timeline:new_entry", handleTimelineEntry);
     };
-  }, [socket]);
+  }, [socket, opportunity?._id, fetchTimeline, invalidateTimelineCache]);
+
+  // Fetch activeStages from timeline when modal opens
+  useEffect(() => {
+    if (!isOpen || !opportunity?._id) return;
+
+    const fetchActiveStages = async () => {
+      try {
+        const result = await fetchTimeline(opportunity._id);
+        const activeStagesFromFetch = Array.isArray(result?.activeStages) ? result.activeStages : [];
+        console.log('[OpportunityCard] Fetched activeStages from timeline context:', activeStagesFromFetch);
+        if (activeStagesFromFetch.length >= 0) {
+          setActiveStages(activeStagesFromFetch);
+        }
+      } catch (err) {
+        console.error('[OpportunityCard] Failed to fetch timeline:', err);
+      }
+    };
+
+    fetchActiveStages();
+  }, [isOpen, opportunity?._id]);
 
 // Determine if current user should see applicants
   const shouldShowApplicants =
@@ -478,7 +487,7 @@ whileHover={isDisabled ? {} : { y: -8 }}
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-purple-900">Posted By</p>
-                      <p className="mt-2 text-sm text-purple-800">{opportunity.createdBy || "Not available"}</p>
+                      <p className="mt-2 text-sm text-purple-800">{opportunity.createdName || "Not available"}</p>
                     </div>
                   </div>
                 </div>

@@ -25,6 +25,11 @@ const opportunitiesReducer = (state, action) => {
       };
     case 'INVALIDATE_CACHE':
       return { ...state, lastFetch: 0 };
+    case 'INVALIDATE_TIMELINE_CACHE':
+      // Clear specific timeline cache for an opportunity
+      const updatedTimelines = { ...state.timelines };
+      delete updatedTimelines[action.opportunityId];
+      return { ...state, timelines: updatedTimelines };
     case 'SET_TIMELINE':
       return {
         ...state,
@@ -32,6 +37,7 @@ const opportunitiesReducer = (state, action) => {
           ...state.timelines,
           [action.opportunityId]: {
             data: Array.isArray(action.data) ? action.data : [],
+            activeStages: Array.isArray(action.activeStages) ? action.activeStages : [],
             timestamp: Date.now(),
           },
         },
@@ -90,7 +96,10 @@ export const OpportunitiesProvider = ({ children }) => {
   const fetchTimeline = useCallback(async (opportunityId) => {
     const cached = state.timelines[opportunityId];
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return Array.isArray(cached.data) ? cached.data : [];
+      return {
+        timeline: Array.isArray(cached.data) ? cached.data : [],
+        activeStages: Array.isArray(cached.activeStages) ? cached.activeStages : [],
+      };
     }
 
     try {
@@ -100,11 +109,12 @@ export const OpportunitiesProvider = ({ children }) => {
       console.log('Context fetchTimeline raw data:', data);
       // Backend returns { timeline: [...], activeStages: [...] }
       const timelineData = Array.isArray(data?.timeline) ? data.timeline : [];
-      dispatch({ type: 'SET_TIMELINE', opportunityId, data: timelineData });
-      return timelineData;
+      const activeStagesData = Array.isArray(data?.activeStages) ? data.activeStages : [];
+      dispatch({ type: 'SET_TIMELINE', opportunityId, data: timelineData, activeStages: activeStagesData });
+      return { timeline: timelineData, activeStages: activeStagesData };
     } catch (error) {
       if (error.name !== 'AbortError') console.error('Timeline fetch failed:', error);
-      return [];
+      return { timeline: [], activeStages: [] };
     }
   }, [state.timelines]);
 
@@ -144,6 +154,10 @@ export const OpportunitiesProvider = ({ children }) => {
     fetchTimeline,
     fetchAttendance,
     updateOpportunityApplied,
+    invalidateTimelineCache: (opportunityId) => {
+      console.log('[Context] Invalidating timeline cache for opportunity:', opportunityId);
+      dispatch({ type: 'INVALIDATE_TIMELINE_CACHE', opportunityId });
+    },
     refetch: () => dispatch({ type: 'INVALIDATE_CACHE' }),
   };
 

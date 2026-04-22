@@ -64,10 +64,17 @@ const OpportunityAttendance = ({ opportunityId, activeStages }) => {
 
   // Auto-select first active stage when component mounts or activeStages changes
   useEffect(() => {
+    console.log('[OpportunityAttendance] Auto-select check:', {
+      selectedStage,
+      activeStages,
+      shouldAutoSelect: !selectedStage && activeStages && activeStages.length > 0
+    });
+
     if (!selectedStage && activeStages && activeStages.length > 0) {
+      console.log('[OpportunityAttendance] Auto-selecting first stage:', activeStages[0]);
       setSelectedStage(activeStages[0]);
     }
-  }, [activeStages, selectedStage]);
+  }, [activeStages]);
 
   // Socket listener for attendance updates
   useEffect(() => {
