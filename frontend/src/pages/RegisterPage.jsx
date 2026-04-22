@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, CheckCircle } from "lucide-react";
 import api, { extractApiData, extractApiError } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { PrimaryButton, StatusMessage } from "../components/ui";
@@ -50,11 +50,11 @@ const RegisterPage = () => {
       const response = await api.post("/auth/register", form);
       const data = extractApiData(response);
       if (import.meta.env.DEV && data?.otp) {
-        setMsg(`${data?.message || "OTP generated"}. Dev OTP: ${data.otp}`);
+        setMsg(`✅ Account created (pending verification). Dev OTP: ${data.otp}`);
       } else if (data?.otpDelivery === "failed" && data?.otp) {
-        setMsg(`${data.message}. Use OTP: ${data.otp}`);
+        setMsg(`⚠️ Account created but email failed. Use OTP: ${data.otp}`);
       } else {
-        setMsg(data?.message || "OTP sent to your email.");
+        setMsg("✅ Account created (pending verification). Check your email for OTP.");
       }
       setStep(2);
     } catch (err) {
@@ -92,10 +92,15 @@ const RegisterPage = () => {
           <div>
             <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
               <Sparkles size={14} />
-              Student onboarding
+              Student Registration
             </div>
-            <h1 className="text-2xl font-semibold text-slate-900">Create your account</h1>
-            <p className="mt-1 text-sm text-slate-600">Register with institute details and verify via OTP to activate your student login.</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Create Student Account</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              {step === 1
+                ? "Step 1/2: Create your pending account with institute details."
+                : "Step 2/2: Enter OTP to activate your account and login."
+              }
+            </p>
           </div>
           <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
             Step {step} of 2
@@ -140,10 +145,14 @@ const RegisterPage = () => {
             <PrimaryButton loading={loading} disabled={loading} onClick={register} className="w-full rounded-xl py-3 md:col-span-2">{loading ? "Sending OTP..." : "Send OTP"}</PrimaryButton>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800">
-              An OTP was sent to <span className="font-semibold">{form.email || "your email"}</span>.
+        <div className="space-y-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-800 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle size={20} className="text-emerald-600" />
+              <strong>Account Pending Verification</strong>
             </div>
+            <p>Enter 6-digit OTP sent to <span className="font-semibold">{form.email || "your email"}</span></p>
+          </div>
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600">OTP</p>
               <input className="input-modern" placeholder="Enter 6-digit OTP" onChange={(e) => setForm({ ...form, otp: e.target.value })} />

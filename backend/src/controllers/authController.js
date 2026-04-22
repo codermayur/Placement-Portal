@@ -60,14 +60,22 @@ const registerStudent = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await User.create({ name, studentId, department, role: "student", email, phone, password: hashedPassword, isVerified: false });
+    const newUser = await User.create({ name, studentId, department, role: "student", email, phone, password: hashedPassword, isVerified: false });
 
     const otp = `${crypto.randomInt(100000, 1000000)}`;
-    await Otp.findOneAndUpdate(
+    const otpDoc = await Otp.findOneAndUpdate(
       { studentId, purpose: "registration" },
       { studentId, email, role: "student", purpose: "registration", otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
-      { upsert: true }
+      { upsert: true, new: true }
     );
+
+    // Ensure OTP was created before proceeding
+    if (!otpDoc) {
+      // If OTP creation failed, delete the user to maintain data consistency
+      await User.deleteOne({ _id: newUser._id });
+      return fail(res, 500, "Failed to create OTP. Please try again.");
+    }
+
     let otpDelivery = "sent";
     let otpDeliveryError = "";
     if (email) {
@@ -103,10 +111,22 @@ const verifyOtp = async (req, res) => {
       return fail(res, 400, "Invalid or expired OTP");
     }
 
-    const user = await User.findOneAndUpdate({ studentId }, { isVerified: true }, { new: true });
+    // Verify student exists and ensure it's actually a student role
+    const user = await User.findOne({ studentId, role: "student", isVerified: false });
+    if (!user) {
+      return fail(res, 400, "Student registration not found or already verified");
+    }
+
+    // Mark as verified
+    const updatedUser = await User.findOneAndUpdate(
+      { studentId, role: "student" },
+      { isVerified: true },
+      { new: true }
+    );
+
     await Otp.deleteOne({ _id: otpDoc._id });
-    const token = signToken(user._id);
-    return ok(res, { token, user: sanitizeUserResponse(user) });
+    const token = signToken(updatedUser._id);
+    return ok(res, { token, user: sanitizeUserResponse(updatedUser) });
   } catch (error) {
     return fail(res, 500, "OTP verification failed", error.message);
   }

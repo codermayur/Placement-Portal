@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { setAuthToken } from "../api";
+import { initSocket } from "../utils/socket";
 
 const AuthContext = createContext(null);
 
@@ -31,6 +32,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => setAuthToken(auth.token), [auth.token]);
+
+  // Initialize Socket.IO on app load
+  useEffect(() => {
+    initSocket();
+  }, []);
 
   return <AuthContext.Provider value={{ ...auth, login, logout }}>{children}</AuthContext.Provider>;
 };

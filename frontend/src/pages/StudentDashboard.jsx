@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import api, { extractApiData, extractApiError } from "../api";
+import toast from "react-hot-toast";
+import { extractApiError } from "../api";
 import { applyToOpportunity } from "../services/opportunitiesService";
 import Layout from "../components/Layout";
 import OpportunityCard from "../components/OpportunityCard";
 import { EmptyState, SectionTitle, Spinner, StatusMessage } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { useOpportunities } from "../context/OpportunitiesContext";
 
 const StudentDashboard = ({ role = "Student" }) => {
+  const { opportunities, fetchOpportunities, updateOpportunityApplied } = useOpportunities();
+  const { user } = useAuth();
   const [active, setActive] = useState([]);
   const [archive, setArchive] = useState([]);
   const [search, setSearch] = useState("");
@@ -14,32 +18,24 @@ const StudentDashboard = ({ role = "Student" }) => {
   const [loading, setLoading] = useState(true);
   const [message] = useState("");
   const [error, setError] = useState("");
-  const [appliedId, setAppliedId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [activeRes, archiveRes] = await Promise.all([api.get("/opportunities/active"), api.get("/opportunities/archive")]);
-      setActive(extractApiData(activeRes) || []);
-      setArchive(extractApiData(archiveRes) || []);
+      const data = await fetchOpportunities();
+      setActive(data.active || []);
+      setArchive(data.archive || []);
     } catch (err) {
       setError(extractApiError(err, "Failed to load opportunities"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchOpportunities]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (appliedId) {
-      load();
-      setAppliedId(null);
-    }
-  }, [appliedId, load]);
 
   const activeView = useMemo(
     () =>
@@ -52,14 +48,19 @@ const StudentDashboard = ({ role = "Student" }) => {
         ),
     [active, search, sort]
   );
+
   const handleApply = useCallback(async (id) => {
     try {
       await applyToOpportunity(id);
-      setAppliedId(id);
+      toast.success("Applied successfully!");
+      updateOpportunityApplied(id, true);
+      setError("");
     } catch (err) {
-      setError(extractApiError(err, "Failed to apply to opportunity"));
+      const errorMsg = extractApiError(err, "Failed to apply to opportunity");
+      toast.error(errorMsg);
+      throw err;
     }
-  }, []);
+  }, [updateOpportunityApplied]);
 
   const archiveView = useMemo(
     () =>

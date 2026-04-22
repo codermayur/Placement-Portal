@@ -11,6 +11,7 @@ const {
   deleteProject,
   uploadResume,
   updateProfessionalLinks,
+  updateStudentId,
 } = require("../controllers/profileController");
 const { protect } = require("../middleware/authMiddleware");
 const { allowRoles } = require("../middleware/roleMiddleware");
@@ -109,6 +110,14 @@ router.post(
   protect,
   allowRoles("student"),
   updateProfessionalLinks
+);
+
+// POST /api/student/student-id - Update student ID
+router.post(
+  "/student-id",
+  protect,
+  allowRoles("student"),
+  updateStudentId
 );
 
 module.exports = router;

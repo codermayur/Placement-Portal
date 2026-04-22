@@ -14,14 +14,25 @@ const opportunitySchema = new mongoose.Schema(
     department: { type: String, required: true, trim: true },
     technicalSkills: [{ type: String, trim: true }],
     applicationLink: { type: String, default: "", trim: true },
-    createdBy: { type: String, required: true, trim: true, index: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     applications: [{
       studentId: { type: String, trim: true },
       studentEmail: { type: String, required: true, trim: true },
       studentName: { type: String, required: true, trim: true },
       studentDepartment: { type: String, required: true, trim: true },
       appliedAt: { type: Date, default: Date.now }
-    }]
+    }],
+    activeStages: {
+      type: [String],
+      default: [],
+      enum: [
+        "Aptitude Test",
+        "Group Discussion",
+        "Technical Interview",
+        "HR Interview",
+        "Result",
+      ],
+    },
   },
   { timestamps: true }
 );

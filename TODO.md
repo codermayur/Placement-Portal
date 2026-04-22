@@ -1,8 +1,11 @@
-# Task: Hide application count and disable clickable student ID for students
+# Fix Timeline POST 500 Error - Steps
 
-## Steps:
-- [x] Step 1: Edit complete ✅
-- [x] Step 2: Verified - application count removed from badge, applications modal/states removed for students (canManage=false), no clickable student IDs or demo data.
-- [x] Step 3: Task complete.
+## Status: [x] Backend Fixed & Restarted | [ ] Test Verified
 
-**All changes implemented in frontend/src/components/OpportunityCard.jsx.**
+1. [x] **OpportunityAttendance.js**: studentId → String ✓
+2. [x] **timeline.js**: Fixed casts/filter/logs ✓
+3. [x] **Backend restarted**: Ready to test
+4. [ ] **Test**: POST timeline (faculty) → no 500
+5. [ ] **Complete**
+
+**Estimated time**: 10 mins

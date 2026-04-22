@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 
 import { motion as Motion } from "framer-motion";
-import { Building2, CalendarClock, ExternalLink, GraduationCap, Pencil, Sparkles, Trash2, Badge, FileText, User, Clock, Code, Calendar, Mail } from "lucide-react";
-import { Modal, PrimaryButton, EmptyState, Spinner } from "./ui";
+import { Building2, CalendarClock, ExternalLink, GraduationCap, Pencil, Sparkles, Trash2, Badge, FileText, User, Clock, Code, Calendar, Mail, AlertTriangle, X } from "lucide-react";
+import { Modal, PrimaryButton, EmptyState, Spinner, StatusMessage } from "./ui";
 import { DEPARTMENTS, OPPORTUNITY_BROADCAST_ALL } from "../constants/departments";
+import { useAuth } from "../context/AuthContext";
+import { useOpportunities } from "../context/OpportunitiesContext";
+import { getSocket } from "../utils/socket";
+import OpportunityTimeline from "./OpportunityTimeline";
+import OpportunityAttendance from "./OpportunityAttendance";
+import { getApplicantsCount, getApplicants } from "../services/opportunitiesService";
 
 const toLabel = (value) => {
   if (!value) return "Not specified";
@@ -24,7 +30,13 @@ const getDepartmentList = (department) => {
   return [];
 };
 
-const isExpired = (value) => new Date(value).getTime() < Date.now();
+const isExpired = (value) => {
+  try {
+    return new Date(value).getTime() < Date.now();
+  } catch {
+    return false;
+  }
+};
 
 const OpportunityCard = ({
   opportunity,
@@ -37,28 +49,140 @@ const OpportunityCard = ({
   editDisabled = false,
   editLoading = false,
   deleteLoading = false,
+  applicantCount = null,
 }) => {
+  const { user } = useAuth();
+  const socket = getSocket();
   const [isOpen, setIsOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [localApplied, setLocalApplied] = useState(hasApplied);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("details");
+  const [activeStages, setActiveStages] = useState([]);
+  const { fetchTimeline } = useOpportunities();
+  const [applicants, setApplicants] = useState([]);
+  const [applicantsLoading, setApplicantsLoading] = useState(false);
+  const [applicantsError, setApplicantsError] = useState("");
   const effectiveApplied = localApplied || hasApplied;
 
-const handleApply = async () => {
+  useEffect(() => {
+    if (!isOpen || !opportunity?._id) return;
+
+    // Join opportunity room on modal open
+    socket.emit("join:opportunity", { opportunityId: opportunity._id });
+
+    // Fetch timeline to get initial activeStages
+    const fetchInitialActiveStages = async () => {
+      try {
+        const timeline = await fetchTimeline(opportunity._id);
+        // fetchTimeline returns the timelineData array from context, which was populated from the response that had activeStages
+        // We need to re-fetch to get activeStages from the backend response directly
+        const response = await fetch(`/api/timeline/${opportunity._id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data?.activeStages) {
+            setActiveStages(result.data.activeStages);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial activeStages:', err);
+      }
+    };
+
+    fetchInitialActiveStages();
+
+    // Cleanup on modal close
+    return () => {
+      socket.emit("leave:opportunity", { opportunityId: opportunity._id });
+    };
+  }, [isOpen, opportunity?._id, socket, fetchTimeline]);
+
+  // Listen for activeStages updates via socket
+  useEffect(() => {
+    const handleTimelineEntry = ({ activeStages: newActiveStages }) => {
+      setActiveStages(newActiveStages);
+    };
+
+    socket.on("timeline:new_entry", handleTimelineEntry);
+
+    return () => {
+      socket.off("timeline:new_entry", handleTimelineEntry);
+    };
+  }, [socket]);
+
+// Determine if current user should see applicants
+  const shouldShowApplicants =
+    (user?.role === "admin") ||
+    (user?.role === "faculty" && String(opportunity.createdBy) === String(user?._id));
+
+  // Fetch applicants when modal opens (faculty own or admin only)
+  useEffect(() => {
+    if (!isOpen || !opportunity?._id || !shouldShowApplicants) return;
+
+    const fetchApplicants = async () => {
+      setApplicantsLoading(true);
+      setApplicantsError("");
+      try {
+        const data = await getApplicants(opportunity._id);
+        setApplicants(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setApplicantsError(err.message || "Unable to load applicants. Please try again.");
+      } finally {
+        setApplicantsLoading(false);
+      }
+    };
+
+    fetchApplicants();
+  }, [isOpen, opportunity?._id, shouldShowApplicants]);
+
+  const handleApply = async () => {
     if (applying || effectiveApplied) return;
     setApplying(true);
+    setError("");
     try {
       await onApply(opportunity._id);
       setLocalApplied(true);
+      setError("");
     } catch (error) {
       console.error("Apply failed:", error);
+      setError(error.message || "Failed to apply. Please try again.");
     } finally {
       setApplying(false);
     }
   };
 
+  // Determine which tabs to show based on role
+  const getTabs = () => {
+    const tabs = ["details", "status-timeline"];
+    if (user?.role === "faculty" || user?.role === "admin") {
+      tabs.push("attendance");
+    }
+    if (shouldShowApplicants) {
+      tabs.push("applicants");
+    }
+    return tabs;
+  };
 
-const archived = opportunity.status === "archived" || isExpired(opportunity.lastDate);
+  const tabs = getTabs();
+  const userRole = user?.role || "student";
+  const userId = user?._id;
+
+  // Determine if current user can edit/delete
+  const canEditDelete =
+    userRole === "admin" ||
+    (userRole === "faculty" && String(opportunity.createdBy) === String(userId));
+
+  // Determine if this is owner for faculty
+  const isFacultyOwner =
+    userRole === "faculty" && String(opportunity.createdBy) === String(userId);
+
+  const archived = opportunity.status === "archived" || isExpired(opportunity.lastDate);
   const isDisabled = archived || effectiveApplied;
+  const isStudent = userRole === "student";
 
   return (
     <>
@@ -74,7 +198,7 @@ whileHover={isDisabled ? {} : { y: -8 }}
         tabIndex={isDisabled ? undefined : 0}
         role={isDisabled ? undefined : "button"}
         aria-disabled={isDisabled}
-        className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/80 bg-white/65 shadow-[0_16px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-200 hover:shadow-[0_22px_44px_-16px_rgba(99,102,241,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${className}`}
+        className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200/80 bg-white/65 shadow-[0_16px_36px_-22px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-all duration-200 hover:shadow-[0_22px_44px_-16px_rgba(99,102,641,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${className}`}
       >
         <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-sky-500 to-cyan-400" />
         <div className="space-y-4 p-5">
@@ -84,7 +208,7 @@ whileHover={isDisabled ? {} : { y: -8 }}
               <span className="rounded-full border border-indigo-200/80 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
                 {opportunity.type}
               </span>
-<span
+              <span
                 className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
                   archived
                     ? "border-rose-200 bg-rose-50 text-rose-700"
@@ -94,7 +218,6 @@ whileHover={isDisabled ? {} : { y: -8 }}
                 }`}
               >
                 {archived ? "Archived" : effectiveApplied ? "Applied" : "Active"}
-{}
               </span>
             </div>
           </div>
@@ -131,11 +254,19 @@ whileHover={isDisabled ? {} : { y: -8 }}
             )}
           </div>
 
+          {/* Show applicant count for faculty/admin */}
+          {!isStudent && applicantCount !== null && (
+            <div className="flex items-center gap-2 rounded-lg bg-indigo-50/60 px-3 py-2 border border-indigo-200/60">
+              <User size={14} className="text-indigo-600" />
+              <span className="text-sm font-medium text-indigo-700">{applicantCount} Applicant{applicantCount !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+
           <PrimaryButton className="w-full" onClick={() => setIsOpen(true)}>
             View Details
           </PrimaryButton>
         </div>
-        {canManage ? (
+        {canManage && canEditDelete ? (
           <div className="pointer-events-none absolute right-3 top-3 flex gap-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
             <button
               type="button"
@@ -180,171 +311,294 @@ whileHover={isDisabled ? {} : { y: -8 }}
         title={opportunity.announcementHeading}
         subtitle=""
       >
-        <div className="space-y-6 text-slate-700">
-          {/* Opportunity Type Badge */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
-              opportunity.type === "Internship"
-                ? "bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 border border-blue-200"
-                : opportunity.type === "Full-Time"
-                ? "bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 border border-emerald-200"
-                : opportunity.type === "Contract"
-                ? "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 border border-orange-200"
-                : "bg-gradient-to-r from-indigo-100 to-indigo-50 text-indigo-700 border border-indigo-200"
-            }`}>
-              <Badge size={16} />
-              {opportunity.type}
-            </span>
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-              archived
-                ? "bg-rose-100 text-rose-700 border border-rose-200"
-                : "bg-emerald-100 text-emerald-700 border border-emerald-200"
-            }`}>
-              <span className={`inline-block h-2 w-2 rounded-full ${archived ? "bg-rose-500" : "bg-emerald-500"}`}></span>
-              {archived ? "Archived" : "Active"}
-            </span>
+        {/* Tab Bar */}
+        <div className="mb-6 border-b border-slate-200">
+          <div className="flex gap-1 -mx-6 px-6">
+            {tabs.map((tab) => {
+              const tabLabel = {
+                "details": "Details",
+                "status-timeline": "Status Timeline",
+                "attendance": "Attendance",
+                "applicants": "Applicants",
+              }[tab];
+
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+                    activeTab === tab
+                      ? "border-indigo-600 text-indigo-600"
+                      : "border-transparent text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {tabLabel}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {/* Description Card */}
-          <div className="space-y-2">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/80 to-slate-100/80 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <div className="flex items-start gap-3">
-                <FileText size={20} className="shrink-0 text-slate-600 mt-1" />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-slate-800 mb-2">Description</h4>
-                  <p className="leading-7 text-slate-700">{opportunity.description || "No description provided."}</p>
-                </div>
+        {/* Tab Content */}
+        <div className="space-y-6 min-h-96">
+          {/* Details Tab */}
+          {activeTab === "details" && (
+            <div className="space-y-6 text-slate-700">
+              {/* Opportunity Type Badge */}
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
+                  opportunity.type === "Internship"
+                    ? "bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 border border-blue-200"
+                    : opportunity.type === "Full-Time"
+                    ? "bg-gradient-to-r from-emerald-100 to-emerald-50 text-emerald-700 border border-emerald-200"
+                    : opportunity.type === "Contract"
+                    ? "bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 border border-orange-200"
+                    : "bg-gradient-to-r from-indigo-100 to-indigo-50 text-indigo-700 border border-indigo-200"
+                }`}>
+                  <Badge size={16} />
+                  {opportunity.type}
+                </span>
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  archived
+                    ? "bg-rose-100 text-rose-700 border border-rose-200"
+                    : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                }`}>
+                  <span className={`inline-block h-2 w-2 rounded-full ${archived ? "bg-rose-500" : "bg-emerald-500"}`}></span>
+                  {archived ? "Archived" : "Active"}
+                </span>
               </div>
-            </div>
-          </div>
 
-          {/* Information Cards Grid */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* Eligibility Card - Indigo Theme */}
-            <div className="group rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/60 to-indigo-100/40 p-5 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-indigo-100 p-2">
-                  <GraduationCap size={18} className="text-indigo-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-indigo-900">Eligibility</p>
-                  <p className="mt-2 text-sm text-indigo-800 leading-6">{toLabel(opportunity.eligibilityCriteria)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Last Date Card - Orange/Warning Theme */}
-            <div className="group rounded-2xl border border-orange-200/60 bg-gradient-to-br from-orange-50/60 to-orange-100/40 p-5 shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-orange-100 p-2">
-                  <CalendarClock size={18} className="text-orange-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-orange-900">Application Deadline</p>
-                  <p className="mt-2 text-sm text-orange-800 font-medium">{new Date(opportunity.lastDate).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric"
-                  })}</p>
-                  <p className="text-xs text-orange-700 mt-1">
-                    {Math.ceil((new Date(opportunity.lastDate) - new Date()) / (1000 * 60 * 60 * 24))} days remaining
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Departments Card - Cyan Theme (Full Width) */}
-            <div className="md:col-span-2 group rounded-2xl border border-cyan-200/60 bg-gradient-to-br from-cyan-50/60 to-cyan-100/40 p-5 shadow-sm hover:shadow-md hover:border-cyan-300 transition-all duration-200">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-cyan-100 p-2">
-                  <Building2 size={18} className="text-cyan-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-cyan-900">Eligible Departments</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {getDepartmentList(opportunity.department).map((dept, idx) => (
-                      <span key={idx} className="rounded-full px-3 py-1.5 bg-cyan-200/60 text-cyan-800 text-xs font-medium border border-cyan-300/50">
-                        {dept}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Technical Skills Card - Purple Theme (Full Width) */}
-            {opportunity.technicalSkills && opportunity.technicalSkills.length > 0 ? (
-              <div className="md:col-span-2 group rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-purple-100/40 p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-lg bg-purple-100 p-2">
-                    <Code size={18} className="text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-purple-900">Required Technical Skills</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {opportunity.technicalSkills.map((skill, idx) => (
-                        <span key={idx} className="rounded-full px-3 py-1.5 bg-purple-200/60 text-purple-800 text-xs font-medium border border-purple-300/50">
-                          {skill}
-                        </span>
-                      ))}
+              {/* Description Card */}
+              <div className="space-y-2">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50/80 to-slate-100/80 p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-start gap-3">
+                    <FileText size={20} className="shrink-0 text-slate-600 mt-1" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-slate-800 mb-2">Description</h4>
+                      <p className="leading-7 text-slate-700">{opportunity.description || "No description provided."}</p>
                     </div>
                   </div>
                 </div>
               </div>
-            ) : null}
 
-            {/* Updated Card - Slate Theme */}
-            <div className="group rounded-2xl border border-slate-200/60 bg-gradient-to-br from-slate-50/60 to-slate-100/40 p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-slate-100 p-2">
-                  <Clock size={18} className="text-slate-600" />
+              {/* Information Cards Grid */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Eligibility Card - Indigo Theme */}
+                <div className="group rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/60 to-indigo-100/40 p-5 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all duration-200">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-indigo-100 p-2">
+                      <GraduationCap size={18} className="text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-indigo-900">Eligibility</p>
+                      <p className="mt-2 text-sm text-indigo-800 leading-6">{toLabel(opportunity.eligibilityCriteria)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-slate-800">Last Updated</p>
-                  <p className="mt-2 text-sm text-slate-700">{opportunity.updatedAt ? new Date(opportunity.updatedAt).toLocaleString() : "Not available"}</p>
+
+                {/* Last Date Card - Orange/Warning Theme */}
+                <div className="group rounded-2xl border border-orange-200/60 bg-gradient-to-br from-orange-50/60 to-orange-100/40 p-5 shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-orange-100 p-2">
+                      <CalendarClock size={18} className="text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-orange-900">Application Deadline</p>
+                      <p className="mt-2 text-sm text-orange-800 font-medium">{new Date(opportunity.lastDate).toLocaleDateString("en-US", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric"
+                      })}</p>
+                      <p className="text-xs text-orange-700 mt-1">
+                        {Math.ceil((new Date(opportunity.lastDate) - new Date()) / (1000 * 60 * 60 * 24))} days remaining
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Departments Card - Cyan Theme (Full Width) */}
+                <div className="md:col-span-2 group rounded-2xl border border-cyan-200/60 bg-gradient-to-br from-cyan-50/60 to-cyan-100/40 p-5 shadow-sm hover:shadow-md hover:border-cyan-300 transition-all duration-200">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-cyan-100 p-2">
+                      <Building2 size={18} className="text-cyan-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-cyan-900">Eligible Departments</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {getDepartmentList(opportunity.department).map((dept, idx) => (
+                          <span key={idx} className="rounded-full px-3 py-1.5 bg-cyan-200/60 text-cyan-800 text-xs font-medium border border-cyan-300/50">
+                            {dept}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Technical Skills Card - Purple Theme (Full Width) */}
+                {opportunity.technicalSkills && opportunity.technicalSkills.length > 0 ? (
+                  <div className="md:col-span-2 group rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-purple-100/40 p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-purple-100 p-2">
+                        <Code size={18} className="text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-purple-900">Required Technical Skills</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {opportunity.technicalSkills.map((skill, idx) => (
+                            <span key={idx} className="rounded-full px-3 py-1.5 bg-purple-200/60 text-purple-800 text-xs font-medium border border-purple-300/50">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Updated Card - Slate Theme */}
+                <div className="group rounded-2xl border border-slate-200/60 bg-gradient-to-br from-slate-50/60 to-slate-100/40 p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-slate-100 p-2">
+                      <Clock size={18} className="text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-800">Last Updated</p>
+                      <p className="mt-2 text-sm text-slate-700">{opportunity.updatedAt ? new Date(opportunity.updatedAt).toLocaleString() : "Not available"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Created By Card - Purple Theme */}
+                <div className="group rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-purple-100/40 p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-lg bg-purple-100 p-2">
+                      <User size={18} className="text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-purple-900">Posted By</p>
+                      <p className="mt-2 text-sm text-purple-800">{opportunity.createdBy || "Not available"}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Created By Card - Purple Theme */}
-            <div className="group rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 to-purple-100/40 p-5 shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-purple-100 p-2">
-                  <User size={18} className="text-purple-600" />
+              {/* Error Message */}
+              {error && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  <AlertTriangle size={16} />
+                  {error}
+                  <button onClick={() => setError("")} className="ml-auto text-red-600 hover:text-red-700">
+                    <X size={16} />
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-purple-900">Posted By</p>
-                  <p className="mt-2 text-sm text-purple-800">{opportunity.createdBy || "Not available"}</p>
-                </div>
+              )}
+
+              {/* Action Button - Only for Students */}
+              {isStudent && (
+                <>
+                  {effectiveApplied ? (
+                    <PrimaryButton disabled className="w-full bg-emerald-200 text-emerald-700 shadow-none hover:translate-y-0 hover:shadow-none">
+                      <span className="flex items-center gap-2 justify-center">
+                        ✓ Applied Successfully
+                      </span>
+                    </PrimaryButton>
+                  ) : archived ? (
+                    <PrimaryButton disabled className="w-full bg-slate-200 text-slate-500 shadow-none hover:translate-y-0 hover:shadow-none">
+                      Archived - Cannot Apply
+                    </PrimaryButton>
+                  ) : (
+                    <PrimaryButton
+                      className="w-full"
+                      onClick={handleApply}
+                      disabled={applying}
+                      loading={applying}
+                    >
+                      <span className="flex items-center gap-2 justify-center">
+                        {applying ? "Applying..." : "Apply Now"}
+                        <Sparkles size={15} />
+                      </span>
+                    </PrimaryButton>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Status Timeline Tab */}
+          {activeTab === "status-timeline" && (
+            <OpportunityTimeline
+              opportunityId={opportunity._id}
+              userRole={userRole}
+              activeStages={activeStages}
+            />
+          )}
+
+          {/* Attendance Tab */}
+          {activeTab === "attendance" && (
+            <OpportunityAttendance
+              opportunityId={opportunity._id}
+              activeStages={activeStages}
+            />
+          )}
+
+          {/* Applicants Tab */}
+          {activeTab === "applicants" && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-1">
+                  Applicants ({applicants.length})
+                </h3>
+                <p className="text-sm text-slate-600">
+                  Total applications for this opportunity
+                </p>
               </div>
-            </div>
-          </div>
 
-          {/* Action Button */}
-{effectiveApplied ? (
-            <PrimaryButton disabled className="w-full bg-emerald-200 text-emerald-700 shadow-none hover:translate-y-0 hover:shadow-none">
-              <span className="flex items-center gap-2 justify-center">
-                ✓ Applied Successfully
-              </span>
-            </PrimaryButton>
-          ) : archived ? (
-            <PrimaryButton disabled className="w-full bg-slate-200 text-slate-500 shadow-none hover:translate-y-0 hover:shadow-none">
-              Archived - Cannot Apply
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton
-              className="w-full"
-              onClick={handleApply}
-              disabled={applying}
-              loading={applying}
-            >
-              {applying ? "Applying..." : "Apply Now"}
-              <Sparkles size={15} />
-            </PrimaryButton>
+              {applicantsLoading ? (
+                <div className="py-8 flex justify-center">
+                  <Spinner />
+                </div>
+              ) : applicantsError ? (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  <AlertTriangle size={16} />
+                  {applicantsError}
+                </div>
+              ) : applicants.length === 0 ? (
+                <EmptyState title="No applicants yet" subtitle="Check back later for applications" />
+              ) : (
+                <div className="space-y-3">
+                  {applicants.map((applicant) => (
+                    <div key={applicant._id} className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 hover:bg-slate-100/50 transition">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-800">{applicant.student.name}</p>
+                            <p className="text-sm text-slate-600">{applicant.student.email}</p>
+                            {applicant.student.department && (
+                              <p className="text-sm text-slate-500 mt-1">
+                                <span className="font-medium">Department:</span> {applicant.student.department}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded ml-2 flex-shrink-0">
+                            {applicant.student.studentId}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Applied on {new Date(applicant.appliedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
+        <StatusMessage type="error" message={error} />
       </Modal>
+    </>
   );
 };
 

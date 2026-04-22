@@ -14,6 +14,8 @@ const StudentProfileForm = ({ department, onFormChange }) => {
 
   // Form State
   const [formData, setFormData] = useState({
+    // Section 0: Student ID
+    studentId: "",
     // Section 1: Academic Info
     academiInfo: {
       year: "",
@@ -66,6 +68,7 @@ const StudentProfileForm = ({ department, onFormChange }) => {
           const profile = data.profile;
           setFormData((prev) => ({
             ...prev,
+            studentId: profile.studentId || "",
             academiInfo: {
               year: profile.academicInfo?.year || "",
               sscPercentage: profile.academicInfo?.sscPercentage || "",
@@ -143,6 +146,26 @@ const StudentProfileForm = ({ department, onFormChange }) => {
   };
 
   // Save functions
+  const saveStudentId = async () => {
+    if (!formData.studentId.trim()) {
+      setErrorMsg("Student ID is required");
+      return;
+    }
+
+    setSavingSection(0);
+    try {
+      await api.post("/student/student-id", {
+        studentId: formData.studentId,
+      });
+      setSuccessMsg("Student ID saved successfully");
+      setErrorMsg("");
+    } catch (error) {
+      setErrorMsg(extractApiError(error, "Failed to save student ID"));
+    } finally {
+      setSavingSection(null);
+    }
+  };
+
   const saveAcademicInfo = async () => {
     const errors = validateAcademicInfo();
     if (Object.keys(errors).length > 0) {
@@ -443,6 +466,7 @@ const StudentProfileForm = ({ department, onFormChange }) => {
       {/* Tabs */}
       <div className="border-b border-slate-200">
         <div className="flex overflow-x-auto">
+          <TabButton id={0} label="Student ID" icon={BookOpen} />
           <TabButton id={1} label="Academic Info" icon={BookOpen} />
           <TabButton id={2} label="Technical Skills" icon={Code} />
           <TabButton id={3} label="Certifications" icon={Award} />
@@ -453,6 +477,37 @@ const StudentProfileForm = ({ department, onFormChange }) => {
 
       {/* Tab Content */}
       <div className="space-y-6">
+        {/* Section 0: Student ID */}
+        {activeTab === 0 && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                Student ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.studentId}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    studentId: e.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                placeholder="e.g., VID123456"
+              />
+              <p className="text-sm text-slate-600">Your student ID is required to apply for opportunities</p>
+            </div>
+            <PrimaryButton
+              onClick={saveStudentId}
+              disabled={savingSection === 0}
+              className="w-full"
+            >
+              {savingSection === 0 ? <Loader className="animate-spin" size={18} /> : "Save Student ID"}
+            </PrimaryButton>
+          </div>
+        )}
+
         {/* Section 1: Academic Information */}
         {activeTab === 1 && (
           <div className="space-y-4">

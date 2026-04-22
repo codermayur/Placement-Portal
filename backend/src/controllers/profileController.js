@@ -491,6 +491,43 @@ const updateProfessionalLinks = async (req, res) => {
   }
 };
 
+// 12. Update Student ID
+const updateStudentId = async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return fail(res, 403, "Only students can update student ID");
+    }
+
+    const { studentId } = req.body;
+
+    if (!studentId || !sanitizeString(studentId)) {
+      return fail(res, 400, "Student ID is required");
+    }
+
+    const sanitizedStudentId = sanitizeString(studentId);
+
+    // Check if another student already has this ID
+    const existing = await User.findOne({ studentId: sanitizedStudentId, _id: { $ne: req.user._id } });
+    if (existing) {
+      return fail(res, 400, "This student ID is already in use");
+    }
+
+    const student = await User.findByIdAndUpdate(
+      req.user._id,
+      { studentId: sanitizedStudentId },
+      { new: true, runValidators: true }
+    );
+
+    if (!student) {
+      return fail(res, 404, "Student not found");
+    }
+
+    return ok(res, { studentId: student.studentId });
+  } catch (error) {
+    return fail(res, 500, "Error updating student ID", error.message);
+  }
+};
+
 module.exports = {
   getStudentProfile,
   updateAcademicInfo,
@@ -503,4 +540,5 @@ module.exports = {
   deleteProject,
   uploadResume,
   updateProfessionalLinks,
+  updateStudentId,
 };

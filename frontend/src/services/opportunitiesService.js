@@ -52,6 +52,24 @@ export const applyToOpportunity = async (id) => {
   }
 };
 
+export const getApplicantsCount = async (id) => {
+  try {
+    const response = await api.get(`/opportunities/${id}/applicants/count`);
+    return extractApiData(response);
+  } catch (error) {
+    throw new Error(extractApiError(error, "Failed to fetch applicant count"));
+  }
+};
+
+export const getApplicants = async (id) => {
+  try {
+    const response = await api.get(`/opportunities/${id}/applicants`);
+    return extractApiData(response);
+  } catch (error) {
+    throw new Error(extractApiError(error, "Failed to fetch applicants"));
+  }
+};
+
 export const getOpportunityApplications = async (id) => {
   try {
     const response = await api.get(`/opportunities/${id}/applications`);

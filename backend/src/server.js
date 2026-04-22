@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const opportunityRoutes = require("./routes/opportunityRoutes");
@@ -9,8 +11,11 @@ const adminRoutes = require("./routes/adminRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 const metadataRoutes = require("./routes/metadataRoutes");
+const timelineRoutes = require("./routes/timeline");
+const attendanceRoutes = require("./routes/attendance");
 const { sanitizeRequest } = require("./middleware/sanitizeMiddleware");
 const { seedAdminUser, DEFAULT_ADMIN } = require("./utils/seedAdmin");
+const { setIO } = require("./utils/io");
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 dotenv.config();
@@ -26,24 +31,19 @@ const isLocalDevOrigin = (origin) =>
   /^https?:\/\/localhost:\d+$/i.test(origin) || /^https?:\/\/127\.0\.0\.1:\d+$/i.test(origin);
 
 const corsOptions = {
-  origin(origin, callback) {
-    // Allow non-browser tools like curl/postman (no Origin header).
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || (process.env.NODE_ENV !== "production" && isLocalDevOrigin(origin))) {
-      return callback(null, true);
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV === "development" && /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin))) {
+      cb(null, true);
+    } else {
+      cb(new Error(`CORS blocked: ${origin}`), false);
     }
-    const corsError = new Error(`CORS blocked for origin: ${origin}`);
-    corsError.status = 403;
-    return callback(corsError);
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
-  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === "development") {
     const origin = req.headers.origin || "no-origin";
@@ -73,10 +73,91 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/student", profileRoutes);
 app.use("/api/metadata", metadataRoutes);
+app.use("/api/timeline", timelineRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
-app.use((err, req, res, next) => {
-  res.status(err.status || 500).json({ message: err.message || "Server error" });
+// Catch-all 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found", status: 404 });
 });
+
+// Comprehensive error handling middleware
+app.use((err, req, res, next) => {
+  const statusCode = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+
+  // Log full error details in development
+  if (process.env.NODE_ENV === "development") {
+    console.error("[BACKEND ERROR]", {
+      status: statusCode,
+      message,
+      method: req.method,
+      url: req.originalUrl,
+      stack: err.stack,
+      body: req.body,
+    });
+  } else {
+    console.error("[BACKEND ERROR]", { status: statusCode, message, url: req.originalUrl });
+  }
+
+  res.status(statusCode).json({ message, status: statusCode });
+});
+
+// Catch-all 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found", status: 404 });
+});
+
+// Create HTTP server for Socket.IO integration
+const server = http.createServer(app);
+
+// Initialize Socket.IO with CORS configuration
+const io = new Server(server, {
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV === "development" && /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/i.test(origin))) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Socket CORS blocked: ${origin}`), false);
+      }
+    },
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ["websocket", "polling"],
+  allowUpgrades: true,
+});
+
+// Set io instance globally so routes can access it
+setIO(io);
+
+// Socket.IO connection handling
+io.on("connection", (socket) => {
+  // eslint-disable-next-line no-console
+  console.log(`[SOCKET] User connected: ${socket.id}`);
+
+  socket.on("join:opportunity", ({ opportunityId }) => {
+    const roomName = `opportunity_${opportunityId}`;
+    socket.join(roomName);
+    // eslint-disable-next-line no-console
+    console.log(`[SOCKET] Socket ${socket.id} joined room ${roomName}`);
+  });
+
+  socket.on("leave:opportunity", ({ opportunityId }) => {
+    const roomName = `opportunity_${opportunityId}`;
+    socket.leave(roomName);
+    // eslint-disable-next-line no-console
+    console.log(`[SOCKET] Socket ${socket.id} left room ${roomName}`);
+  });
+
+  socket.on("disconnect", () => {
+    // eslint-disable-next-line no-console
+    console.log(`[SOCKET] User disconnected: ${socket.id}`);
+  });
+});
+
+// Export io instance for use in route handlers
+module.exports = { server, io, app };
 
 const startServer = async () => {
   if (!process.env.MONGODB_URI) {
@@ -96,9 +177,9 @@ const startServer = async () => {
     console.log(`[ADMIN SEED] Admin already present: email=${adminSeedResult.email}`);
   }
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`Server running on port ${PORT}`);
+    console.log(`[SERVER] Running on port ${PORT} with Socket.IO`);
   });
 };
 

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { OpportunitiesProvider } from "./context/OpportunitiesContext";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import StudentDashboard from "./pages/StudentDashboard";
@@ -33,7 +34,8 @@ const PublicOnly = ({ children }) => {
 
 const App = () => {
   return (
-    <Routes>
+    <OpportunitiesProvider>
+      <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
       <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
@@ -51,6 +53,7 @@ const App = () => {
       <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </OpportunitiesProvider>
   );
 };
 
