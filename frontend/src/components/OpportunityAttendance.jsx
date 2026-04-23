@@ -93,6 +93,8 @@ const OpportunityAttendance = ({ opportunityId, activeStages }) => {
 
   // Socket listener for attendance updates
   useEffect(() => {
+    if (!socket) return; // Guard against null socket
+
     const handleAttendanceUpdate = ({ studentId, stage, status, markedBy, markedAt }) => {
       if (stage === selectedStage) {
         setAttendanceList((prev) =>

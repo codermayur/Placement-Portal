@@ -33,7 +33,14 @@ const normalizeToForm = (item) => ({
   applicationLink: item.applicationLink || "",
 });
 
-const isArchived = (item) => new Date(item.lastDate).getTime() < Date.now();
+const isArchived = (item) => {
+  // ⭐ MATCH BACKEND LOGIC: Compare dates at midnight, not timestamps
+  const lastMidnight = new Date(item.lastDate);
+  lastMidnight.setHours(0, 0, 0, 0);
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+  return todayMidnight > lastMidnight;
+};
 
 const isOwner = (opportunity, userEmail) => {
   if (!opportunity || !userEmail) return false;

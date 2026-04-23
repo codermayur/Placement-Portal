@@ -46,7 +46,7 @@ const LoginPage = () => {
           : { role: form.role, email: form.email.trim(), password: form.password };
       const response = await api.post("/auth/login", payload);
       const data = extractApiData(response);
-      login(data.token, data.user);
+      login(data.accessToken, data.user);
       navigate("/");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");

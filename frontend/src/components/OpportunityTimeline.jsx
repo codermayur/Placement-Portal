@@ -81,6 +81,8 @@ const stageOrder = [
 
   // Socket listener for new timeline entries
   useEffect(() => {
+    if (!socket) return; // Guard against null socket
+
     const handleTimelineEntry = ({ entry, activeStages: newActiveStages }) => {
       console.log('[Timeline Socket] New entry received:', entry, 'activeStages:', newActiveStages);
       setTimelineEntries((prev) => {

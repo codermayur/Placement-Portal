@@ -32,7 +32,16 @@ const getDepartmentList = (department) => {
 
 const isExpired = (value) => {
   try {
-    return new Date(value).getTime() < Date.now();
+    // ⭐ MATCH BACKEND LOGIC: Compare dates at midnight, not timestamps
+    // This ensures opportunities remain active through their entire lastDate
+    const lastMidnight = new Date(value);
+    lastMidnight.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0); // Today at midnight
+
+    // Archive only if today is AFTER lastDate (strictly greater-than)
+    return todayMidnight > lastMidnight;
   } catch {
     return false;
   }
@@ -66,19 +75,23 @@ const OpportunityCard = ({
   const effectiveApplied = localApplied || hasApplied;
 
   useEffect(() => {
-    if (!isOpen || !opportunity?._id) return;
+    if (!isOpen || !opportunity?._id || !socket) return;
 
     // Join opportunity room on modal open
     socket.emit("join:opportunity", { opportunityId: opportunity._id });
 
     // Cleanup on modal close
     return () => {
-      socket.emit("leave:opportunity", { opportunityId: opportunity._id });
+      if (socket) {
+        socket.emit("leave:opportunity", { opportunityId: opportunity._id });
+      }
     };
   }, [isOpen, opportunity?._id, socket]);
 
   // Listen for activeStages updates via socket and refetch timeline
   useEffect(() => {
+    if (!socket) return; // Guard against null socket
+
     const handleTimelineEntry = ({ activeStages: newActiveStages }) => {
       console.log('[OpportunityCard Socket] timeline:new_entry received with activeStages:', newActiveStages);
       if (opportunity?._id) {

@@ -3,19 +3,41 @@ const {
   login,
   registerStudent,
   verifyOtp,
+  refreshAccessToken,
+  logout,
   changePassword,
   requestPasswordResetOtp,
   resetPasswordWithOtp,
 } = require("../controllers/authController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, verifyRefreshToken } = require("../middleware/auth");
+const { authLimiter, otpLimiter } = require("../middleware/rateLimiter");
+const {
+  validateRegister,
+  validateLogin,
+  validateVerifyOtp,
+  validateChangePassword,
+  validateForgotPasswordRequest,
+  validatePasswordReset
+} = require("../middleware/validate");
 
 const router = express.Router();
 
-router.post("/register", registerStudent);
-router.post("/verify-otp", verifyOtp);
-router.post("/login", login);
-router.post("/change-password", protect, changePassword);
-router.post("/forgot-password/request-otp", requestPasswordResetOtp);
-router.post("/forgot-password/reset", resetPasswordWithOtp);
+// Registration routes
+router.post("/register", authLimiter, validateRegister, registerStudent);
+router.post("/verify-otp", otpLimiter, validateVerifyOtp, verifyOtp);
+
+// Login route
+router.post("/login", authLimiter, validateLogin, login);
+
+// Refresh token route (get new access token)
+router.post("/refresh", verifyRefreshToken, refreshAccessToken);
+
+// Logout route (clear refresh token cookie)
+router.post("/logout", protect, logout);
+
+// Password management routes
+router.post("/change-password", protect, validateChangePassword, changePassword);
+router.post("/forgot-password/request-otp", otpLimiter, validateForgotPasswordRequest, requestPasswordResetOtp);
+router.post("/forgot-password/reset", otpLimiter, validatePasswordReset, resetPasswordWithOtp);
 
 module.exports = router;

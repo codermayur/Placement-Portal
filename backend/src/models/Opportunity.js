@@ -63,6 +63,6 @@ opportunitySchema.pre("validate", function validateDepartment() {
 });
 
 opportunitySchema.index({ lastDate: 1 });
-opportunitySchema.index({ createdAt: -1 });
+opportunitySchema.index({ createdAt: 1 });
 
 module.exports = mongoose.model("Opportunity", opportunitySchema);

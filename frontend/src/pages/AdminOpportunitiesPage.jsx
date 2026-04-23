@@ -187,7 +187,15 @@ const AdminOpportunitiesPage = () => {
     );
   };
 
-  const isArchived = (item) => item.status === "archived" || new Date(item.lastDate).getTime() < Date.now();
+  const isArchived = (item) => {
+    if (item.status === "archived") return true;
+    // ⭐ MATCH BACKEND LOGIC: Compare dates at midnight, not timestamps
+    const lastMidnight = new Date(item.lastDate);
+    lastMidnight.setHours(0, 0, 0, 0);
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    return todayMidnight > lastMidnight;
+  };
 
   return (
     <>

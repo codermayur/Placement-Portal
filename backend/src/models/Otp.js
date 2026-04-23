@@ -6,8 +6,15 @@ const otpSchema = new mongoose.Schema(
     email: { type: String, trim: true, lowercase: true },
     role: { type: String, enum: ["admin", "faculty", "student"] },
     purpose: { type: String, enum: ["registration", "password_reset"], default: "registration" },
-    otp: { type: String, required: true },
+    otp: { type: String, required: true }, // Hashed OTP (bcrypt or SHA-256)
+    isHashed: { type: Boolean, default: true }, // Flag indicating if otp field is hashed
     expiresAt: { type: Date, required: true },
+
+    // OTP verification attempt tracking
+    failedAttempts: { type: Number, default: 0 }, // Number of failed verification attempts
+    maxAttempts: { type: Number, default: 3 }, // Max failed attempts before expiring OTP
+    isExpired: { type: Boolean, default: false }, // Flag to mark OTP as expired after max attempts
+
     // Registration data - stored temporarily until OTP verification
     registrationData: {
       name: { type: String },

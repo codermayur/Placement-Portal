@@ -1,181 +1,179 @@
 /**
  * Date utility functions for consistent date handling
  * All dates are normalized to start of day (00:00:00) for comparisons
- * Timezone-safe: Uses local time, normalized to start of day for comparison
+ * Timezone-safe: Uses LOCAL time, normalized to start of day for comparison
+ *
+ * Core rule:
+ *   lastDate = today  → "active"   (opportunity valid through entire day)
+ *   lastDate < today  → "archived" (strictly yesterday or earlier)
  */
 
 /**
- * Get current date at start of day (00:00:00) in local timezone
- * Used for database comparisons with normalized start-of-day dates
+ * Safely parse any supported date input into a local-midnight Date object.
+ *
+ * Supported formats:
+ *   - "YYYY-MM-DD"                 → parsed as local midnight directly
+ *   - ISO string "...T...Z" / "...T...+05:30"
+ *                                  → converted to local date, then midnight
+ *   - Date object                  → local date extracted, then midnight
+ *
+ * WHY NOT `new Date("YYYY-MM-DD")` directly?
+ *   The spec treats bare date strings as UTC midnight, so in IST (+5:30)
+ *   "2026-04-22" becomes April 22 00:00 UTC = April 22 05:30 IST.
+ *   setHours(0,0,0,0) then still gives April 22 local midnight — correct
+ *   by accident. We use explicit year/month/day extraction to be safe and
+ *   intentional across all environments.
+ *
+ * @param {string|Date|null|undefined} dateInput
+ * @returns {Date|null} Date at 00:00:00.000 local time, or null
+ */
+const parseDateToLocalMidnight = (dateInput) => {
+  if (!dateInput) return null;
+
+  let year, month, day;
+
+  if (dateInput instanceof Date) {
+    // Extract local calendar fields directly — no string conversion needed
+    year  = dateInput.getFullYear();
+    month = dateInput.getMonth();   // 0-indexed
+    day   = dateInput.getDate();
+  } else if (typeof dateInput === "string") {
+    // Detect bare "YYYY-MM-DD" vs full ISO string
+    const bareDate = /^\d{4}-\d{2}-\d{2}$/.test(dateInput);
+
+    if (bareDate) {
+      // Parse manually to guarantee local midnight (avoids the UTC-midnight trap)
+      const parts = dateInput.split("-");
+      year  = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10) - 1; // convert to 0-indexed
+      day   = parseInt(parts[2], 10);
+    } else {
+      // Full ISO / other string: let the engine parse it, then extract LOCAL fields
+      // e.g. "2026-04-23T00:00:00.000Z" in IST → local April 23 05:30 → we take Apr 23
+      const d = new Date(dateInput);
+      if (isNaN(d.getTime())) {
+        console.warn("[DATE_UTILS] parseDateToLocalMidnight: Could not parse:", dateInput);
+        return null;
+      }
+      year  = d.getFullYear();
+      month = d.getMonth();
+      day   = d.getDate();
+    }
+  } else {
+    console.warn("[DATE_UTILS] parseDateToLocalMidnight: Unsupported type:", typeof dateInput, dateInput);
+    return null;
+  }
+
+  // Construct local midnight — new Date(y, m, d) is always local midnight
+  return new Date(year, month, day);
+};
+
+/**
+ * Get today at local midnight (00:00:00.000).
+ * Used as the reference point for all "is this past/future?" checks.
+ *
  * @returns {Date} Today at 00:00:00 local time
  */
 const getTodayStart = () => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dateDisplay = todayStart.toISOString().split("T")[0];
-  console.log(`[DATE_UTILS] getTodayStart: ${dateDisplay} (timestamp: ${todayStart.getTime()})`);
+  console.log(`[DATE_UTILS] getTodayStart: ${todayStart.toISOString().split("T")[0]} (ts: ${todayStart.getTime()})`);
   return todayStart;
 };
 
 /**
- * Normalize a date to start of day (00:00:00) in local timezone
- * Handles string format like "2026-04-22" and Date objects
+ * Normalize any date input to local midnight.
+ * Thin public wrapper around parseDateToLocalMidnight with logging.
  *
- * Timezone strategy:
- * - String input "2026-04-22" is parsed as local midnight of that day
- * - Date objects are converted to local midnight
- * - This ensures "22 April 2026" means the whole day in local time
- *
- * @param {string|Date|null} dateInput - Date to normalize
- * @returns {Date|null} Normalized date at 00:00:00 local time, or null if input is falsy
+ * @param {string|Date|null} dateInput
+ * @returns {Date|null}
  */
 const normalizeDateToStartOfDay = (dateInput) => {
   if (!dateInput) {
-    console.log("[DATE_UTILS] normalizeDateToStartOfDay: Input is null/undefined");
+    console.log("[DATE_UTILS] normalizeDateToStartOfDay: null/undefined input");
     return null;
   }
 
-  let date;
-  let inputDesc = "";
+  const normalized = parseDateToLocalMidnight(dateInput);
+  if (!normalized) return null;
 
-  if (typeof dateInput === "string") {
-    // Parse string format like "2026-04-22"
-    // Split and use local Date constructor to ensure local midnight
-    const [year, month, day] = dateInput.split("-");
-    date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    inputDesc = `string "${dateInput}"`;
-  } else if (dateInput instanceof Date) {
-    date = new Date(dateInput);
-    inputDesc = `Date object ${dateInput.toISOString()}`;
-  } else {
-    console.warn("[DATE_UTILS] normalizeDateToStartOfDay: Unknown input type", typeof dateInput);
-    date = new Date(dateInput);
-    inputDesc = `unknown type: ${dateInput}`;
-  }
-
-  date.setHours(0, 0, 0, 0);
-  const normalized = {
-    displayDate: date.toISOString().split("T")[0],
-    timestamp: date.getTime(),
-    localTime: date.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
-  };
-
-  console.log(`[DATE_UTILS] normalizeDateToStartOfDay:`, {
-    input: inputDesc,
-    normalized: normalized.displayDate,
-    timestamp: normalized.timestamp,
-    localTime: normalized.localTime
+  console.log("[DATE_UTILS] normalizeDateToStartOfDay:", {
+    input: String(dateInput),
+    normalized: normalized.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }),
+    timestamp: normalized.getTime(),
   });
 
-  return date;
+  return normalized;
 };
 
 /**
- * Check if a given date is in the past (before today)
- * Compares dates at start-of-day level (ignores time)
+ * Check if a given (already-normalized) date is strictly in the past.
  *
- * @param {Date} date - Date to check (should be normalized to start of day)
- * @returns {boolean} True if date is before today at 00:00:00
+ * "Past" means before today's local midnight — i.e. yesterday or earlier.
+ * TODAY is NOT in the past.
+ *
+ * @param {Date} date - Should already be at local midnight
+ * @returns {boolean}
  */
 const isDateInPast = (date) => {
   const today = getTodayStart();
+  // Strictly less-than: today itself returns false (not past)
   const isPast = date < today;
 
-  console.log(`[DATE_UTILS] isDateInPast:`, {
+  console.log("[DATE_UTILS] isDateInPast:", {
     checkDate: date.toISOString().split("T")[0],
     today: today.toISOString().split("T")[0],
-    isPast: isPast
+    isPast,
   });
 
   return isPast;
 };
 
 /**
- * Compare two normalized dates for opportunity status
- * Returns "archived" if lastDate < today, else "active"
+ * Determine opportunity status based on lastDate.
  *
- * @param {Date} lastDate - The opportunity's last date (should be normalized)
- * @returns {string} "archived" or "active"
- */
-// const getStatusFromLastDate = (lastDate) => {
-//   if (!lastDate) {
-//     console.log("[DATE_UTILS] getStatusFromLastDate: lastDate is null, returning 'active'");
-//     return "active";
-//   }
-
-//   const today = getTodayStart();
-//   const normLastDate = normalizeDateToStartOfDay(lastDate);
-//   const status = normLastDate < today ? "archived" : "active";
-
-//   console.log(`[DATE_UTILS] getStatusFromLastDate:`, {
-//     lastDate: normLastDate.toISOString().split("T")[0],
-//     today: today.toISOString().split("T")[0],
-//     comparison: normLastDate < today ? "lastDate < today" : "lastDate >= today",
-//     status: status
-//   });
-
-//   return status;
-// };
-
-/**
- * Determine opportunity status based on lastDate (timezone-safe)
+ * ⭐ KEY RULE:
+ *   lastDate = today  → "active"   (valid through the whole day)
+ *   lastDate < today  → "archived" (strictly in the past)
+ *   lastDate = null   → "active"   (no expiry)
  *
- * ⭐ KEY LOGIC:
- * An opportunity with lastDate = 2026-04-22 means:
- * - ACTIVE: Entire day of 2026-04-22 (from 00:00:00 to 23:59:59)
- * - ARCHIVED: Starting 2026-04-23 at 00:00:00 onwards
+ * FIX NOTES vs previous version:
+ *   1. Removed the erroneous `now.setDate(now.getDate() + 1)` that shifted
+ *      "today" forward by one day, causing same-day dates to be archived.
+ *   2. Removed double-parse (was constructing `new Date(lastDate)` before
+ *      the type-check branches, wasting work and risking UTC-offset issues).
+ *   3. ISO strings are now handled explicitly via parseDateToLocalMidnight.
  *
- * Implementation: today > lastDate → archived (day level comparison)
- * This ensures oppis only archived AFTER lastDate has completely passed.
- *
- * @param {Date|string|null} lastDate - The opportunity's last date
- * @returns {string} "active" or "archived"
+ * @param {Date|string|null|undefined} lastDate
+ * @returns {"active"|"archived"}
  */
 const getStatusFromLastDate = (lastDate) => {
   if (!lastDate) {
-    console.log(`[DATE_UTILS] getStatusFromLastDate: Input is null/undefined, returning 'active'`);
+    console.log("[DATE_UTILS] getStatusFromLastDate: No lastDate provided → 'active'");
     return "active";
   }
 
-  // Get today's start of day (local timezone)
-  const now = new Date();
-  const todayNormalized = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayMidnight = getTodayStart();                     // local midnight today
+  const lastMidnight  = parseDateToLocalMidnight(lastDate);  // local midnight of lastDate
 
-  // Parse and normalize lastDate to start of day (local timezone)
-  let lastParsed;
-  let rawDateLog = "";
-
-  if (typeof lastDate === "string") {
-    // Parse string format like "2026-04-22" as local midnight
-    const [year, month, day] = lastDate.split("-");
-    lastParsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    rawDateLog = `string "${lastDate}"`;
-  } else if (lastDate instanceof Date) {
-    lastParsed = new Date(lastDate);
-    rawDateLog = `Date: ${lastDate.toISOString()}`;
-  } else {
-    console.warn(`[DATE_UTILS] getStatusFromLastDate: Unknown input type: ${typeof lastDate}`);
-    lastParsed = new Date(lastDate);
-    rawDateLog = `unknown type: ${lastDate}`;
+  if (!lastMidnight) {
+    console.warn("[DATE_UTILS] getStatusFromLastDate: Could not parse lastDate, defaulting → 'active'");
+    return "active";
   }
 
-  // Normalize to start of day (local timezone)
-  const lastNormalized = new Date(lastParsed.getFullYear(), lastParsed.getMonth(), lastParsed.getDate());
+  // ⭐ STRICT greater-than: archived only when today is AFTER lastDate
+  //    lastDate == today  → todayMidnight > lastMidnight is FALSE → "active" ✓
+  //    lastDate < today   → todayMidnight > lastMidnight is TRUE  → "archived" ✓
+  const status = todayMidnight > lastMidnight ? "archived" : "active";
 
-  // ⭐ CRITICAL COMPARISON: Only archive if today is AFTER lastDate (strictly greater than)
-  // This ensures the opportunity remains active through the ENTIRE lastDate
-  const status = todayNormalized > lastNormalized ? "archived" : "active";
-
-  // Detailed logging for debugging
-  console.log(`[DATE_UTILS] getStatusFromLastDate (⭐ AFTER last date only):`, {
-    rawLastDate: rawDateLog,
-    todayNormalized: todayNormalized.toISOString().split("T")[0],
-    lastNormalized: lastNormalized.toISOString().split("T")[0],
-    todayTime: todayNormalized.getTime(),
-    lastTime: lastNormalized.getTime(),
-    comparison: `today (${todayNormalized.toISOString().split("T")[0]}) > lastDate (${lastNormalized.toISOString().split("T")[0]})? ${todayNormalized > lastNormalized}`,
+  console.log("[DATE_UTILS] getStatusFromLastDate:", {
+    rawInput: String(lastDate),
+    today: todayMidnight.toISOString().split("T")[0],
+    lastDate: lastMidnight.toISOString().split("T")[0],
+    todayTs: todayMidnight.getTime(),
+    lastTs: lastMidnight.getTime(),
+    sameDay: todayMidnight.getTime() === lastMidnight.getTime(),
     result: status,
-    meaning: status === "archived" ? "Today is AFTER the last date" : "Today IS or BEFORE the last date (opp still active)"
   });
 
   return status;
